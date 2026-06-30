@@ -1,0 +1,17 @@
+# =============================================================================
+# 皮卡斯 2.0 Railway 部署配置
+# Railway 免费额度: 500MB 磁盘 + 每月 $5 信用额，完全够用
+# =============================================================================
+
+[build]
+  builder = "nixpacks"
+  buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+  startCommand = "python main.py --serve"
+  healthcheckPath = "/health"
+  restartPolicyType = "ON_FAILURE"
+  numReplicas = 1
+
+# 环境变量 (在 Railway Dashboard → Variables 中设置 LLM_API_KEY)
+# LLM_API_KEY=sk-xxxxx (不要写在这里！)
