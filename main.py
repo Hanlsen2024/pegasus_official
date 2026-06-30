@@ -1,24 +1,20 @@
 """
-皮卡斯 (Picas) - 多市场多分析师投票系统
-黄金/美股/A股 → 各自独立的智能体管线
-"""
+皮卡斯 2.0 (Picas) — AI驱动的多智能体量化信号引擎
+对标 Brale 架构: 快慢双循环 + 多Agent LLM推理 + 指标计算库
 
+用法:
+  python main.py gold        # 黄金AI分析
+  python main.py us -s AAPL   # 美股AI分析
+  python main.py a -s 600519  # A股AI分析
+"""
 import json
-import datetime
+import argparse
 import logging
 import sys
-import argparse
-import traceback
+import os
 
-from data.fetcher import get_market_data
-from data.gold_fetcher import get_gold_full
-from core.analysts import get_all_analysts as get_stock_analysts
-from core.gold_analysts import get_gold_analysts
-from core.engine import VotingEngine
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ---------------------------------------------------------------------------
-# 日志
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -27,227 +23,75 @@ logging.basicConfig(
 logger = logging.getLogger("picas")
 
 
-# ---------------------------------------------------------------------------
-# 统一输出格式
-# ---------------------------------------------------------------------------
-
-def _format_output(market: str, symbol: str, engine_result: dict,
-                   analyst_votes: list, current_price: float = None) -> dict:
-    """将投票引擎结果转为统一 API 格式"""
-    return {
-        "timestamp": datetime.datetime.now().isoformat(),
-        "market": market,
-        "symbol": symbol,
-        "signal": engine_result["action"],
-        "net_score": round(engine_result.get("score", 0), 4),
-        "buy_score": round(engine_result.get("buy_score", 0), 4),
-        "sell_score": round(engine_result.get("sell_score", 0), 4),
-        "price": round(current_price, 2) if current_price else None,
-        "analyst_votes": analyst_votes,
-        "analyst_count": len(analyst_votes),
-    }
-
-
-# ---------------------------------------------------------------------------
-# 黄金专属分析管线 (4H + 日线)
-# ---------------------------------------------------------------------------
-
-def run_gold_analysis() -> dict:
-    """黄金专属分析：多周期数据 + 6位黄金专属智能体"""
-    logger.info("=" * 50)
-    logger.info("🥇 启动黄金专属分析管线 (4H + 日线)")
-    logger.info("=" * 50)
-
-    # 1) 获取多周期数据
-    try:
-        gold_data = get_gold_full()
-    except Exception as e:
-        return {"timestamp": datetime.datetime.now().isoformat(), "error": f"黄金数据获取失败: {e}"}
-
-    df_4h = gold_data.get("df_4h", pd.DataFrame())
-    if df_4h.empty:
-        return {"timestamp": datetime.datetime.now().isoformat(), "error": "黄金4H数据为空"}
-
-    # 2) 黄金专属分析师
-    analysts = get_gold_analysts()
-    logger.info(f"黄金智能体数量: {len(analysts)}")
-
-    # 3) 各分析师独立分析
-    signals = []
-    analyst_votes = []
-
-    for analyst in analysts:
-        try:
-            result = analyst.analyze(gold_data)
-            signals.append({
-                "action": result["action"],
-                "score": result["score"],
-                "weight": analyst.weight,
-                "reason": result.get("reason", ""),
-            })
-            analyst_votes.append({
-                "name": analyst.name,
-                "signal": result["action"],
-                "score": round(result["score"], 4),
-                "reason": result.get("reason", ""),
-            })
-            logger.info(f"  {analyst.name:28s} → {result['action']:4s} "
-                       f"score={result['score']:.3f}  {result.get('reason','')}")
-        except Exception as e:
-            logger.error(f"分析师 {analyst.name} 出错: {e}")
-            signals.append({"action": "HOLD", "score": 0.0, "weight": analyst.weight})
-            analyst_votes.append({"name": analyst.name, "signal": "HOLD", "score": 0, "reason": f"异常:{e}"})
-
-    # 4) 投票
-    engine = VotingEngine()
-    result = engine.vote(signals)
-
-    # 5) 价格
-    price = float(df_4h["close"].iloc[-1]) if "close" in df_4h.columns else None
-
-    return _format_output("gold", "GC=F", result, analyst_votes, price)
-
-
-# ---------------------------------------------------------------------------
-# 股票分析管线 (日线)
-# ---------------------------------------------------------------------------
-
-def run_stock_analysis(market: str, symbol: str) -> dict:
-    """股票分析：日线数据 + 5位通用股票智能体"""
-    logger.info("=" * 50)
-    logger.info(f"📊 启动股票分析管线 market={market} symbol={symbol}")
-    logger.info("=" * 50)
-
-    # 1) 获取数据
-    try:
-        import pandas as pd
-        df = get_market_data(market=market, symbol=symbol)
-    except Exception as e:
-        return {"timestamp": datetime.datetime.now().isoformat(), "error": f"数据获取失败: {e}"}
-
-    if df is None or df.empty:
-        return {"timestamp": datetime.datetime.now().isoformat(), "error": "获取数据为空"}
-
-    # 2) 股票分析师
-    analysts = get_stock_analysts()
-    logger.info(f"股票智能体数量: {len(analysts)}")
-
-    # 3) 分析
-    signals = []
-    analyst_votes = []
-
-    for analyst in analysts:
-        try:
-            result = analyst.analyze({"df": df})
-            signals.append({
-                "action": result["action"],
-                "score": result["score"],
-                "weight": analyst.weight,
-                "reason": result.get("reason", ""),
-            })
-            analyst_votes.append({
-                "name": analyst.name,
-                "signal": result["action"],
-                "score": round(result["score"], 4),
-                "reason": result.get("reason", ""),
-            })
-        except Exception as e:
-            logger.error(f"分析师 {analyst.name} 出错: {e}")
-            signals.append({"action": "HOLD", "score": 0.0, "weight": analyst.weight})
-            analyst_votes.append({"name": analyst.name, "signal": "HOLD", "score": 0, "reason": f"异常:{e}"})
-
-    # 4) 投票
-    engine = VotingEngine()
-    result = engine.vote(signals)
-
-    # 5) 价格
-    price = float(df["close"].iloc[-1]) if "close" in df.columns else None
-
-    return _format_output(market, symbol, result, analyst_votes, price)
-
-
-# ---------------------------------------------------------------------------
-# Mock 测试管线
-# ---------------------------------------------------------------------------
-
-def run_mock_analysis() -> dict:
-    """离线测试"""
-    from data.fetcher import get_mock_data
-    import pandas as pd
-
-    df = get_mock_data()
-    analysts = get_stock_analysts()
-    signals = []
-    analyst_votes = []
-
-    for analyst in analysts:
-        try:
-            result = analyst.analyze({"df": df})
-            signals.append({"action": result["action"], "score": result["score"],
-                           "weight": analyst.weight, "reason": result.get("reason", "")})
-            analyst_votes.append({"name": analyst.name, "signal": result["action"],
-                                  "score": round(result["score"], 4), "reason": result.get("reason", "")})
-        except Exception as e:
-            signals.append({"action": "HOLD", "score": 0.0, "weight": analyst.weight})
-            analyst_votes.append({"name": analyst.name, "signal": "HOLD", "score": 0, "reason": f"异常:{e}"})
-
-    engine = VotingEngine()
-    result = engine.vote(signals)
-    price = float(df["close"].iloc[-1])
-    return _format_output("mock", None, result, analyst_votes, price)
-
-
-# ---------------------------------------------------------------------------
-# 统一入口
-# ---------------------------------------------------------------------------
-
-def run_analysis(market: str = "gold", symbol: str = None) -> dict:
-    """
-    统一分析入口，按市场分流到不同智能体管线
-
-    Args:
-        market: "gold" / "us" / "a" / "mock"
-        symbol: 股票代码
-    """
-    try:
-        if market == "gold":
-            return run_gold_analysis()
-        elif market == "mock":
-            return run_mock_analysis()
-        else:
-            return run_stock_analysis(market, symbol)
-    except Exception as e:
-        logger.exception("分析异常")
-        return {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "error": f"分析失败: {e}",
-        }
-
-
-# ---------------------------------------------------------------------------
-# CLI 入口
-# ---------------------------------------------------------------------------
-
 def main():
-    parser = argparse.ArgumentParser(description="皮卡斯 - 多市场交易信号分析")
+    parser = argparse.ArgumentParser(
+        description="皮卡斯 2.0 — AI驱动的多智能体量化信号引擎"
+    )
     parser.add_argument("market", nargs="?", default="gold",
-                        choices=["gold", "us", "a", "mock"],
-                        help="gold(黄金)/us(美股)/a(A股)/mock(测试)")
+                        help="市场: gold(黄金) / us(美股) / a(A股)")
     parser.add_argument("-s", "--symbol", default=None, help="股票代码")
-    parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--no-ai", action="store_true",
+                        help="禁用AI，回退到纯数学指标模式")
+    parser.add_argument("--compact", action="store_true",
+                        help="紧凑输出(隐藏推理细节)")
+    parser.add_argument("--serve", action="store_true",
+                        help="启动API服务")
 
     args = parser.parse_args()
-    symbol = args.symbol
 
-    # 自动推断
-    if not symbol and args.market not in ("gold", "us", "a", "mock"):
-        symbol = args.market
-        args.market = "a" if (symbol.isdigit() and len(symbol) == 6) else "us"
+    if args.serve:
+        import uvicorn
+        logger.info("启动皮卡斯 API 服务 http://0.0.0.0:8000")
+        uvicorn.run("api.index:app", host="0.0.0.0", port=8000, reload=False)
+        return
 
-    output = run_analysis(market=args.market, symbol=symbol)
+    if args.no_ai:
+        # 回退到旧版纯指标分析
+        from data.fetcher import get_market_data
+        from data.gold_fetcher import get_gold_full
+        from core.analysts import get_all_analysts as get_stock_analysts
+        from core.gold_analysts import get_gold_analysts
+        from core.engine import VotingEngine
+        import pandas as pd, datetime as dt
+
+        def old_run(market, symbol):
+            if market == "gold":
+                gold_data = get_gold_full()
+                df_4h = gold_data.get("df_4h", pd.DataFrame())
+                analysts = get_gold_analysts()
+                signals, votes = [], []
+                for a in analysts:
+                    r = a.analyze(gold_data)
+                    signals.append({"action": r["action"], "score": r["score"], "weight": a.weight, "reason": r.get("reason", "")})
+                    votes.append({"name": a.name, "signal": r["action"], "score": round(r["score"], 4), "confidence": 0, "reason": r.get("reason", ""), "reasoning": "", "signals": []})
+                engine = VotingEngine()
+                vr = engine.vote(signals)
+                price = float(df_4h["close"].iloc[-1]) if not df_4h.empty else 0
+                return {"timestamp": dt.datetime.now().isoformat(), "market": "gold", "symbol": "GC=F", "signal": vr["action"], "net_score": round(vr.get("score", 0), 4), "buy_score": round(vr.get("buy_score", 0), 4), "sell_score": round(vr.get("sell_score", 0), 4), "price": round(price, 2), "agent_count": len(analysts), "analyst_votes": votes, "indicators_snapshot": {}}
+            else:
+                df = get_market_data(market=market, symbol=symbol)
+                analysts = get_stock_analysts()
+                signals, votes = [], []
+                for a in analysts:
+                    r = a.analyze({"df": df})
+                    signals.append({"action": r["action"], "score": r["score"], "weight": a.weight, "reason": r.get("reason", "")})
+                    votes.append({"name": a.name, "signal": r["action"], "score": round(r["score"], 4), "confidence": 0, "reason": r.get("reason", ""), "reasoning": "", "signals": []})
+                engine = VotingEngine()
+                vr = engine.vote(signals)
+                price = float(df["close"].iloc[-1]) if "close" in df.columns else 0
+                return {"timestamp": dt.datetime.now().isoformat(), "market": market, "symbol": symbol, "signal": vr["action"], "net_score": round(vr.get("score", 0), 4), "buy_score": round(vr.get("buy_score", 0), 4), "sell_score": round(vr.get("sell_score", 0), 4), "price": round(price, 2), "agent_count": len(analysts), "analyst_votes": votes, "indicators_snapshot": {}}
+
+        result = old_run(args.market, args.symbol)
+    else:
+        from core.pipeline import run_ai_pipeline
+        result = run_ai_pipeline(market=args.market, symbol=args.symbol)
+
     if args.compact:
-        output.pop("analyst_votes", None)
-    print(json.dumps(output, indent=2, ensure_ascii=False))
+        # 紧凑输出：只保留投票摘要
+        result.pop("analyst_votes", None)
+        result.pop("indicators_snapshot", None)
+
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

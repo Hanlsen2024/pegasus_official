@@ -3,86 +3,111 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>皮卡斯 Picas — 智能交易信号分析</title>
+<title>皮卡斯 2.0 — AI量化信号引擎</title>
 <style>
   :root {
-    --bg: #0f0f1a; --card: #1a1a2e; --card2: #16213e;
-    --accent: #e94560; --accent2: #0f3460; --gold: #f0a500;
-    --green: #00c853; --red: #ff1744; --text: #e0e0e0;
-    --muted: #888; --border: #2a2a4a; --radius: 12px;
+    --bg: #0b0b15; --card: #13132b; --card2: #1a1a3a;
+    --accent: #e94560; --accent2: #5333ed; --gold: #f0a500;
+    --green: #00e676; --red: #ff1744; --text: #e0e0f0;
+    --muted: #8888aa; --border: #252550; --radius: 14px;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; }
-  .header { text-align:center; padding:40px 20px 20px; }
-  .header h1 { font-size:2.8rem; font-weight:900;
-    background:linear-gradient(135deg,var(--accent),var(--gold));
+    background:var(--bg); color:var(--text); min-height:100vh;
+    background-image: radial-gradient(ellipse at 50% 0%, #1a1040 0%, var(--bg) 70%); }
+  .header { text-align:center; padding:50px 20px 30px; }
+  .header h1 { font-size:2.6rem; font-weight:900;
+    background:linear-gradient(135deg,#e94560,#5333ed,#f0a500);
     -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; letter-spacing:2px; }
-  .header .sub { color:var(--muted); margin-top:6px; font-size:0.95rem; }
-  .container { width:100%; max-width:640px; padding:0 20px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:28px; margin-bottom:20px; }
-  .card h3 { font-size:1rem; margin-bottom:16px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
-  .market-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+  .header .badge { display:inline-block; margin-top:8px; padding:4px 14px; border-radius:20px;
+    background:rgba(83,51,237,0.2); color:#8b7cf0; font-size:0.78rem; font-weight:600; letter-spacing:1px; }
+  .header .sub { color:var(--muted); margin-top:10px; font-size:0.9rem; }
+  .container { width:100%; max-width:720px; margin:0 auto; padding:0 20px 40px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:16px; }
+  .card h3 { font-size:0.85rem; margin-bottom:14px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; }
+  .market-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
   .market-btn { background:var(--card2); border:2px solid var(--border); border-radius:var(--radius);
-    padding:16px 12px; cursor:pointer; text-align:center; transition:all 0.2s; color:var(--text); font-size:0.9rem; }
-  .market-btn:hover { border-color:var(--accent2); }
-  .market-btn.active { border-color:var(--accent); background:rgba(233,69,96,0.1); }
-  .market-btn .icon { font-size:1.6rem; display:block; margin-bottom:6px; }
-  .input-group { display:flex; gap:10px; }
-  .input-group input { flex:1; background:var(--card2); border:2px solid var(--border);
+    padding:16px 10px; cursor:pointer; text-align:center; transition:all 0.2s; color:var(--text); font-size:0.88rem; }
+  .market-btn:hover { border-color:var(--accent2); background:rgba(83,51,237,0.1); }
+  .market-btn.active { border-color:var(--accent); background:rgba(233,69,96,0.1); box-shadow:0 0 20px rgba(233,69,96,0.1); }
+  .market-btn .icon { font-size:1.5rem; display:block; margin-bottom:4px; }
+  .input-row { display:flex; gap:10px; }
+  .input-row input { flex:1; background:var(--card2); border:2px solid var(--border);
     border-radius:var(--radius); padding:14px 16px; color:var(--text); font-size:1rem; outline:none; transition:border 0.2s; }
-  .input-group input:focus { border-color:var(--accent); }
-  .input-group input::placeholder { color:#555; }
-  .preset-hint { margin-top:8px; font-size:0.78rem; color:var(--muted); }
-  .preset-hint span { color:var(--gold); cursor:pointer; text-decoration:underline; margin:0 3px; }
-  .btn-analyze { width:100%; background:linear-gradient(135deg,var(--accent),#c23152);
+  .input-row input:focus { border-color:var(--accent); }
+  .input-row input::placeholder { color:#555; }
+  .presets { margin-top:10px; font-size:0.78rem; color:var(--muted); display:flex; flex-wrap:wrap; gap:4px 8px; }
+  .presets span { color:#8b7cf0; cursor:pointer; transition:color 0.2s; }
+  .presets span:hover { color:var(--accent); }
+  .btn-analyze { width:100%; background:linear-gradient(135deg,#e94560,#5333ed);
     color:#fff; border:none; border-radius:var(--radius); padding:16px; font-size:1.1rem;
-    font-weight:700; cursor:pointer; letter-spacing:1px; transition:opacity 0.2s,transform 0.1s; }
-  .btn-analyze:hover { opacity:0.9; } .btn-analyze:active { transform:scale(0.98); }
-  .btn-analyze:disabled { opacity:0.4; cursor:not-allowed; }
-  .loading { display:none; text-align:center; padding:20px; color:var(--muted); }
-  .spinner { display:inline-block; width:32px; height:32px; border:3px solid var(--border);
-    border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+    font-weight:700; cursor:pointer; letter-spacing:1px; transition:all 0.2s; margin-top:12px; }
+  .btn-analyze:hover { opacity:0.92; transform:translateY(-1px); box-shadow:0 8px 30px rgba(83,51,237,0.3); }
+  .btn-analyze:active { transform:scale(0.98); }
+  .btn-analyze:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .loading { display:none; text-align:center; padding:30px; }
+  .spinner { display:inline-block; width:40px; height:40px; border:3px solid var(--border);
+    border-top-color:var(--accent2); border-radius:50%; animation:spin 0.8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  .result { display:none; margin-top:20px; }
-  .signal-badge { display:inline-block; padding:8px 24px; border-radius:50px;
-    font-size:1.4rem; font-weight:900; letter-spacing:2px; margin-bottom:16px; }
-  .signal-BUY  { background:rgba(0,200,83,0.15); color:var(--green); border:2px solid var(--green); }
-  .signal-SELL { background:rgba(255,23,68,0.15); color:var(--red); border:2px solid var(--red); }
-  .signal-HOLD { background:rgba(240,165,0,0.15); color:var(--gold); border:2px solid var(--gold); }
-  .scores { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
-  .score-item { background:var(--card2); border-radius:var(--radius); padding:14px; text-align:center; }
-  .score-item .val { font-size:1.6rem; font-weight:800; }
-  .score-item .lbl { font-size:0.75rem; color:var(--muted); margin-top:4px; }
+  .loading p { color:var(--muted); margin-top:14px; font-size:0.88rem; }
+  .result { display:none; }
+  .signal-header { text-align:center; padding:20px 0; }
+  .signal-badge { display:inline-block; padding:10px 32px; border-radius:50px;
+    font-size:1.6rem; font-weight:900; letter-spacing:3px; margin-bottom:8px; }
+  .signal-BUY  { background:rgba(0,230,118,0.12); color:var(--green); border:2px solid var(--green); }
+  .signal-SELL { background:rgba(255,23,68,0.12); color:var(--red); border:2px solid var(--red); }
+  .signal-HOLD { background:rgba(240,165,0,0.12); color:var(--gold); border:2px solid var(--gold); }
+  .scores { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px 0; }
+  .score-item { background:var(--card2); border-radius:var(--radius); padding:14px 10px; text-align:center; }
+  .score-item .val { font-size:1.5rem; font-weight:800; }
+  .score-item .lbl { font-size:0.72rem; color:var(--muted); margin-top:4px; text-transform:uppercase; }
   .val.buy { color:var(--green); } .val.sell { color:var(--red); } .val.net { color:var(--gold); }
-  .analyst-list { display:grid; gap:8px; }
-  .analyst-item { display:flex; align-items:center; justify-content:space-between;
-    background:var(--card2); border-radius:var(--radius); padding:12px 16px; border-left:4px solid var(--border); }
-  .analyst-item.buy { border-left-color:var(--green); }
-  .analyst-item.sell { border-left-color:var(--red); }
-  .analyst-item.hold { border-left-color:var(--gold); }
-  .analyst-name { font-weight:600; }
-  .analyst-desc { font-size:0.78rem; color:var(--muted); }
-  .analyst-signal { font-size:0.8rem; font-weight:700; padding:4px 12px; border-radius:20px; }
-  .analyst-signal.buy { color:var(--green); background:rgba(0,200,83,0.1); }
-  .analyst-signal.sell { color:var(--red); background:rgba(255,23,68,0.1); }
-  .analyst-signal.hold { color:var(--gold); background:rgba(240,165,0,0.1); }
-  .symbol-label { font-size:0.85rem; color:var(--muted); margin-bottom:10px; }
-  .error-msg { display:none; background:rgba(255,23,68,0.1); border:1px solid var(--red);
-    color:var(--red); border-radius:var(--radius); padding:16px; margin-top:12px; font-size:0.9rem; }
-  .footer { padding:30px; color:var(--muted); font-size:0.78rem; text-align:center; }
-  @media (max-width:480px) {
+  .agent-card { background:var(--card2); border-radius:var(--radius); padding:16px; margin-bottom:10px;
+    border-left:4px solid var(--border); transition:border-color 0.3s; }
+  .agent-card.buy { border-left-color:var(--green); }
+  .agent-card.sell { border-left-color:var(--red); }
+  .agent-card.hold { border-left-color:var(--gold); }
+  .agent-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .agent-name { font-weight:700; font-size:0.95rem; }
+  .agent-meta { display:flex; gap:12px; align-items:center; }
+  .agent-signal { font-size:0.78rem; font-weight:700; padding:3px 14px; border-radius:16px; letter-spacing:1px; }
+  .agent-signal.buy { color:var(--green); background:rgba(0,230,118,0.1); }
+  .agent-signal.sell { color:var(--red); background:rgba(255,23,68,0.1); }
+  .agent-signal.hold { color:var(--gold); background:rgba(240,165,0,0.1); }
+  .agent-conf { font-size:0.75rem; color:var(--muted); }
+  .agent-reason { font-size:0.82rem; color:#ccc; line-height:1.5; margin:6px 0; }
+  .agent-reasoning { font-size:0.78rem; color:var(--muted); margin-top:8px; padding:10px;
+    background:rgba(0,0,0,0.2); border-radius:8px; line-height:1.6;
+    max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-word;
+    display:none; }
+  .agent-reasoning.show { display:block; }
+  .reasoning-toggle { font-size:0.72rem; color:var(--accent2); cursor:pointer; margin-top:4px; display:inline-block; }
+  .reasoning-toggle:hover { text-decoration:underline; }
+  .agent-signals-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .signal-tag { font-size:0.7rem; padding:2px 8px; border-radius:10px;
+    background:rgba(83,51,237,0.15); color:#8b7cf0; }
+  .snapshot { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .snap-item { background:var(--card2); border-radius:8px; padding:10px 14px; }
+  .snap-item .lbl { font-size:0.7rem; color:var(--muted); }
+  .snap-item .val { font-size:0.92rem; font-weight:600; margin-top:2px; }
+  .error-msg { display:none; background:rgba(255,23,68,0.08); border:1px solid var(--red);
+    color:var(--red); border-radius:var(--radius); padding:16px; margin-top:12px; font-size:0.88rem; }
+  .footer { padding:30px; color:var(--muted); font-size:0.75rem; text-align:center; }
+  @media (max-width:500px) {
     .header h1 { font-size:2rem; }
-    .market-btn { padding:12px 8px; font-size:0.78rem; }
-    .scores { gap:8px; }
+    .market-btn { padding:12px 6px; font-size:0.75rem; }
+    .scores { gap:6px; }
+    .snapshot { grid-template-columns:1fr; }
   }
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>皮卡斯 PICAS</h1>
-  <p class="sub">多市场 · 多分析师 · 加权投票 · 智能交易信号</p>
+  <h1>皮卡斯 PICAS 2.0</h1>
+  <div class="badge">AI x 多Agent 量化信号引擎</div>
+  <p class="sub">对标 Brale Dual-Loop · LLM驱动 · 指标共振 · 形态识别 · 趋势判断</p>
 </div>
+
 <div class="container">
   <div class="card">
     <h3>📍 选择市场</h3>
@@ -91,39 +116,137 @@
       <button class="market-btn" data-market="us"><span class="icon">🇺🇸</span>美股</button>
       <button class="market-btn" data-market="a"><span class="icon">🇨🇳</span>A股</button>
     </div>
-    <div class="input-group">
+    <div class="input-row">
       <input type="text" id="symbolInput" placeholder="输入代码 (如 AAPL / 600519 / 贵州茅台)">
     </div>
-    <div class="preset-hint" id="presetHint">常用标的：<span onclick="fillSymbol('GC=F')">黄金期货</span></div>
+    <div class="presets" id="presetHint"></div>
   </div>
-  <button class="btn-analyze" id="btnAnalyze" onclick="run()">⚡ 开始分析</button>
-  <div class="loading" id="loading"><div class="spinner"></div><p style="margin-top:12px">分析师正在投票中...</p></div>
+  <button class="btn-analyze" id="btnAnalyze" onclick="runAnalysis()">🧠 AI 深度分析</button>
+  <div class="loading" id="loading"><div class="spinner"></div><p>AI Agent 正在推理中...</p></div>
   <div class="error-msg" id="error"></div>
+
   <div class="result" id="result">
     <div class="card">
-      <div class="symbol-label" id="symbolLabel"></div>
-      <div class="signal-badge" id="signalBadge"></div>
+      <div class="signal-header">
+        <div id="symbolLabel" style="font-size:0.85rem;color:var(--muted);margin-bottom:8px;"></div>
+        <div class="signal-badge" id="signalBadge"></div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;" id="priceLabel"></div>
+      </div>
       <div class="scores">
         <div class="score-item"><div class="val buy" id="buyScore">-</div><div class="lbl">买入得分</div></div>
         <div class="score-item"><div class="val sell" id="sellScore">-</div><div class="lbl">卖出得分</div></div>
         <div class="score-item"><div class="val net" id="netScore">-</div><div class="lbl">净得分</div></div>
       </div>
-      <h3>🎯 分析师投票</h3>
-      <div class="analyst-list" id="analystList"></div>
+      <h3>🎯 AI Agent 推理结果</h3>
+      <div id="agentList"></div>
+      <h3 style="margin-top:14px;">📊 指标快照</h3>
+      <div class="snapshot" id="indicatorSnapshot"></div>
     </div>
   </div>
 </div>
-<div class="footer">皮卡斯 Picas v1.0.0 &nbsp;|&nbsp; 数据仅供参考，不构成投资建议</div>
+<div class="footer">皮卡斯 Picas 2.0 · AI驱动的多Agent量化信号引擎 · 数据仅供参考，不构成投资建议</div>
+
 <script>
 let currentMarket='gold';
-document.querySelectorAll('.market-btn').forEach(function(btn){btn.addEventListener('click',function(){document.querySelectorAll('.market-btn').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');currentMarket=btn.dataset.market;updatePresets();document.getElementById('symbolInput').value='';hideResult()})});
-var presets={gold:[["GC=F","黄金期货"],["AU0","上期所黄金"]],us:[["AAPL","苹果"],["TSLA","特斯拉"],["MSFT","微软"],["NVDA","英伟达"],["SPY","标普500"],["QQQ","纳指100"],["AMZN","亚马逊"],["GOOGL","谷歌"],["META","Meta"],["AMD","AMD"]],a:[["600519","贵州茅台"],["000858","五粮液"],["300750","宁德时代"],["000001","平安银行"],["600036","招商银行"],["002594","比亚迪"],["601318","中国平安"],["600276","恒瑞医药"]]};
-function updatePresets(){var h=document.getElementById('presetHint'),i=presets[currentMarket]||[];h.innerHTML='常用标的：'+i.map(function(p){return '<span onclick="fillSymbol(\''+p[0]+'\')">'+p[1]+'</span>'}).join(' ')}
+const presets={
+  gold:[["GC=F","黄金期货"],["AU0","上期所黄金"]],
+  us:[["AAPL","苹果"],["TSLA","特斯拉"],["MSFT","微软"],["NVDA","英伟达"],["SPY","标普500"],["QQQ","纳指100"],["AMZN","亚马逊"],["GOOGL","谷歌"],["META","Meta"]],
+  a:[["600519","贵州茅台"],["000858","五粮液"],["300750","宁德时代"],["000001","平安银行"],["002594","比亚迪"],["601318","中国平安"],["600036","招商银行"]]
+};
+
+document.querySelectorAll('.market-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.market-btn').forEach(function(b){b.classList.remove('active')});
+    btn.classList.add('active');
+    currentMarket=btn.dataset.market;
+    updatePresets();
+    document.getElementById('symbolInput').value='';
+    hideResult();
+  })
+});
+
+function updatePresets(){
+  var h=document.getElementById('presetHint'),items=presets[currentMarket]||[];
+  h.innerHTML=items.map(function(p){return '<span onclick="fillSymbol(\''+p[0]+'\')">'+p[1]+'</span>'}).join(' · ');
+}
 function fillSymbol(s){document.getElementById('symbolInput').value=s}
-function hideResult(){document.getElementById('result').style.display='none';document.getElementById('error').style.display='none'}
-document.getElementById('symbolInput').addEventListener('keydown',function(e){if(e.key==='Enter')run()});
-async function run(){var s=document.getElementById('symbolInput').value.trim(),b=document.getElementById('btnAnalyze'),l=document.getElementById('loading'),e=document.getElementById('error');hideResult();b.disabled=true;l.style.display='block';try{var u='/analyze?market='+currentMarket;if(s)u+='&symbol='+encodeURIComponent(s);var r=await fetch(u);if(!r.ok){var j=await r.json();throw new Error(j.error||'HTTP '+r.status)}var d=await r.json();renderResult(d,s)}catch(err){e.textContent='❌ '+err.message;e.style.display='block'}finally{b.disabled=false;l.style.display='none'}}
-function renderResult(d,s){document.getElementById('result').style.display='block';var n={gold:'黄金期货',us:'美股',a:'A股'};document.getElementById('symbolLabel').textContent=(n[currentMarket]||currentMarket)+' · '+(d.symbol||s||'-');var b=document.getElementById('signalBadge');b.textContent=d.signal||'-';b.className='signal-badge signal-'+(d.signal||'HOLD');document.getElementById('buyScore').textContent=d.buy_score!=null?d.buy_score.toFixed(2):'-';document.getElementById('sellScore').textContent=d.sell_score!=null?d.sell_score.toFixed(2):'-';document.getElementById('netScore').textContent=d.net_score!=null?d.net_score.toFixed(2):'-';var l=document.getElementById('analystList');l.innerHTML='';if(d.analyst_votes)d.analyst_votes.forEach(function(v){var c=(v.signal||'').toLowerCase();l.innerHTML+='<div class="analyst-item '+c+'"><div><div class="analyst-name">'+v.name+'</div><div class="analyst-desc">'+(v.reason||'')+'</div></div><span class="analyst-signal '+c+'">'+v.signal+'</span></div>'})}
+function hideResult(){
+  document.getElementById('result').style.display='none';
+  document.getElementById('error').style.display='none';
+}
+document.getElementById('symbolInput').addEventListener('keydown',function(e){if(e.key==='Enter')runAnalysis()});
+
+async function runAnalysis(){
+  var s=document.getElementById('symbolInput').value.trim(),
+      b=document.getElementById('btnAnalyze'),
+      l=document.getElementById('loading'),
+      e=document.getElementById('error');
+  hideResult(); b.disabled=true; l.style.display='block';
+  try{
+    var u='/analyze?market='+currentMarket;
+    if(s) u+='&symbol='+encodeURIComponent(s);
+    var r=await fetch(u);
+    if(!r.ok){var j=await r.json();throw new Error(j.error||'HTTP '+r.status)}
+    var d=await r.json();renderResult(d,s);
+  }catch(err){
+    e.textContent='❌ '+err.message; e.style.display='block';
+  }finally{b.disabled=false;l.style.display='none'}
+}
+
+function renderResult(d,s){
+  document.getElementById('result').style.display='block';
+  var n={gold:'🥇 黄金期货',us:'🇺🇸 美股',a:'🇨🇳 A股'};
+  document.getElementById('symbolLabel').textContent=(n[currentMarket]||currentMarket)+' · '+(d.symbol||s||'-');
+  if(d.price) document.getElementById('priceLabel').textContent='当前价格: $'+d.price;
+
+  var b=document.getElementById('signalBadge');
+  b.textContent=d.signal||'HOLD';
+  b.className='signal-badge signal-'+(d.signal||'HOLD');
+
+  document.getElementById('buyScore').textContent=d.buy_score!=null?d.buy_score.toFixed(3):'-';
+  document.getElementById('sellScore').textContent=d.sell_score!=null?d.sell_score.toFixed(3):'-';
+  document.getElementById('netScore').textContent=d.net_score!=null?d.net_score.toFixed(3):'-';
+
+  // Agent 投票列表
+  var al=document.getElementById('agentList'); al.innerHTML='';
+  if(d.analyst_votes) d.analyst_votes.forEach(function(v,i){
+    var c=(v.signal||'').toLowerCase(),
+        conf=v.confidence!=null?(v.confidence*100).toFixed(0)+'%':'',
+        reason=v.reason||'',
+        reasoning=v.reasoning||'',
+        signals=v.signals||[],
+        sigTags=signals.map(function(s){return '<span class="signal-tag">'+s+'</span>'}).join(''),
+        toggleId='reasoning-'+i;
+    al.innerHTML+=
+      '<div class="agent-card '+c+'">'+
+        '<div class="agent-header">'+
+          '<div class="agent-name">'+v.name+'</div>'+
+          '<div class="agent-meta">'+
+            '<span class="agent-conf">'+conf+'</span>'+
+            '<span class="agent-signal '+c+'">'+v.signal+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="agent-reason">'+reason+'</div>'+
+        (sigTags?'<div class="agent-signals-tags">'+sigTags+'</div>':'')+
+        (reasoning?'<span class="reasoning-toggle" onclick="document.getElementById(\''+toggleId+'\').classList.toggle(\'show\');this.textContent=document.getElementById(\''+toggleId+'\').classList.contains(\'show\')?\'收起推理过程 ▲\':\'展开推理过程 ▼\'">展开推理过程 ▼</span><div class="agent-reasoning" id="'+toggleId+'">'+reasoning+'</div>':'')+
+      '</div>';
+  });
+
+  // 指标快照
+  var snap=document.getElementById('indicatorSnapshot'); snap.innerHTML='';
+  if(d.indicators_snapshot){
+    var map={rsi14:'RSI(14)',ema_cross:'EMA交叉',macd_direction:'MACD方向',bb_position:'布林带位置'};
+    for(var k in d.indicators_snapshot){
+      var v=d.indicators_snapshot[k];
+      if(v!=null){
+        snap.innerHTML+='<div class="snap-item"><div class="lbl">'+(map[k]||k)+'</div><div class="val">'+v+'</div></div>';
+      }
+    }
+  }
+
+  // 滚动到结果
+  document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
+}
 updatePresets();
 </script>
 </body>

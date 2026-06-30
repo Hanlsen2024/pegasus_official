@@ -1,23 +1,26 @@
 """
-皮卡斯 API - FastAPI Serverless (Vercel)
+皮卡斯 2.0 API — FastAPI Serverless (Vercel)
+新增: AI推理结果展示、推理过程返回、计划管理
 """
-
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from main import run_analysis
 
-app = FastAPI(title="皮卡斯 Picas API", version="1.0.0")
+app = FastAPI(title="皮卡斯 Picas 2.0 API", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 @app.get("/analyze")
 def analyze(market: str = Query("gold"), symbol: str = Query(None)):
+    """核心分析接口 — AI Agent 驱动"""
     try:
-        result = run_analysis(market=market, symbol=symbol)
+        from core.pipeline import run_ai_pipeline
+        result = run_ai_pipeline(market=market, symbol=symbol)
+        if "error" in result:
+            return JSONResponse(status_code=500, content=result)
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -25,35 +28,26 @@ def analyze(market: str = Query("gold"), symbol: str = Query(None)):
 
 @app.get("/markets")
 def markets():
-    from data.fetcher import US_STOCK_MAP, A_STOCK_MAP
-    from core.gold_analysts import get_gold_analysts
-    from core.analysts import get_all_analysts
+    """市场与 Agent 信息"""
+    from config.loader import get_market_config
+    markets_info = {}
+    for m in ["gold", "us_stock", "a_stock"]:
+        cfg = get_market_config(m)
+        markets_info[m] = {
+            "name": cfg.get("name", m),
+            "timeframes": cfg.get("timeframes", []),
+            "agents": cfg.get("agents", []),
+            "presets": cfg.get("presets", {}),
+        }
     return {
-        "markets": {
-            "gold": {
-                "name": "黄金期货",
-                "data": "4H+日线多周期",
-                "analysts": len(get_gold_analysts()),
-                "analyst_names": [a.name for a in get_gold_analysts()],
-            },
-            "us": {
-                "name": "美股",
-                "data": "日线",
-                "analysts": len(get_all_analysts()),
-                "analyst_names": [a.name for a in get_all_analysts()],
-            },
-            "a": {
-                "name": "A股",
-                "data": "日线",
-                "analysts": len(get_all_analysts()),
-                "analyst_names": [a.name for a in get_all_analysts()],
-            },
-        },
-        "us_presets": {k: v for k, v in US_STOCK_MAP.items()},
-        "a_presets": {k: f"{v[1]}{v[0]}" for k, v in A_STOCK_MAP.items()},
+        "service": "皮卡斯 Picas 2.0",
+        "architecture": "AI驱动的多Agent量化信号引擎 (对标Brale Dual-Loop)",
+        "agents": ["Indicator Agent(指标共振)", "Pattern Agent(形态识别)", "Trend Agent(趋势方向)"],
+        "llm": "OpenAI兼容协议 (GPT/Claude/DeepSeek)",
+        "markets": markets_info,
     }
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "2.0.0"}
