@@ -1,86 +1,59 @@
 """
-黄金专属数据获取模块 - 支持 4H / 1D 多周期
+黄金数据获取 — MT5 优先 (实时+4H原生支持) → akshare 备用
 """
-
 import pandas as pd
-import numpy as np
 import logging
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# COMEX 黄金期货 (yfinance)
-GOLD_SYMBOL = "GC=F"
-# 美元指数 (用于参考)
-DXY_SYMBOL = "DX-Y.NYB"
-
-
-def _get_yf_data(symbol: str, period: str, interval: str) -> pd.DataFrame:
-    """yfinance 通用抓取"""
-    try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=period, interval=interval)
-        if df.empty:
-            return pd.DataFrame()
-        df.columns = [c.lower() for c in df.columns]
-        return df
-    except Exception as e:
-        logger.warning(f"yfinance [{symbol}] 失败: {e}")
-        return pd.DataFrame()
-
 
 def get_gold_4h() -> pd.DataFrame:
-    """
-    获取黄金 4 小时 K 线数据
-    原理：yfinance 拉 1H 数据 → resample 为 4H
-    
-    Returns:
-        pd.DataFrame (columns: open, high, low, close, volume)
-    """
-    logger.info("获取黄金 4H 数据...")
+    """获取黄金 4H K线 (MT5优先)"""
+    # ---- 尝试 MT5 ----
+    try:
+        from data.mt5_fetcher import get_mt5_rates, init_mt5
+        if init_mt5():
+            df = get_mt5_rates("XAUUSD", "4h", 200)
+            if not df.empty:
+                logger.info(f"MT5 黄金 4H: {len(df)} 条")
+                return df
+    except Exception as e:
+        logger.warning(f"MT5 不可用: {e}")
 
-    # 拉近 30 天 1H 数据，足够生成 4H K线
-    df_1h = _get_yf_data(GOLD_SYMBOL, period="30d", interval="1h")
-
-    if df_1h.empty:
-        logger.warning("yfinance 1H 数据为空，降级为日线")
-        return _get_yf_data(GOLD_SYMBOL, period="6mo", interval="1d")
-
-    # Resample: 1H → 4H
-    df_4h = df_1h.resample("4h").agg({
-        "open":  "first",
-        "high":  "max",
-        "low":   "min",
-        "close": "last",
-        "volume": "sum",
-    })
-    df_4h = df_4h.dropna()
-    logger.info(f"黄金 4H 数据: {len(df_4h)} 条K线")
-    return df_4h
+    # ---- 备用 akshare ----
+    logger.info("MT5 不可用，使用 akshare 日线数据")
+    return _get_ak_gold()
 
 
 def get_gold_daily() -> pd.DataFrame:
-    """获取黄金日线数据（补充视角）"""
-    return _get_yf_data(GOLD_SYMBOL, period="6mo", interval="1d")
+    """获取黄金日线"""
+    try:
+        from data.mt5_fetcher import get_mt5_rates, init_mt5
+        if init_mt5():
+            df = get_mt5_rates("XAUUSD", "1d", 120)
+            if not df.empty:
+                return df
+    except Exception:
+        pass
+    return _get_ak_gold()
 
 
 def get_dxy_daily() -> pd.DataFrame:
-    """获取美元指数日线（用于黄金负相关验证）"""
-    return _get_yf_data(DXY_SYMBOL, period="6mo", interval="1d")
+    """美元指数"""
+    try:
+        from data.mt5_fetcher import get_mt5_rates, init_mt5
+        if init_mt5():
+            df = get_mt5_rates("US30", "1d", 120)
+            if not df.empty:
+                return df
+    except Exception:
+        pass
+    return pd.DataFrame()
 
 
 def get_gold_full() -> dict:
-    """
-    获取黄金多周期数据包
-    
-    Returns:
-        {
-            "df_4h": pd.DataFrame,      # 4小时K线（主力分析周期）
-            "df_daily": pd.DataFrame,   # 日线（辅助确认）
-            "dxy": pd.DataFrame,        # 美元指数（宏观参考）
-        }
-    """
+    """黄金多周期数据包"""
     return {
         "df_4h": get_gold_4h(),
         "df_daily": get_gold_daily(),
@@ -88,13 +61,20 @@ def get_gold_full() -> dict:
     }
 
 
-# =====================================================================
-# 测试
-# =====================================================================
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    data = get_gold_full()
-    for k, v in data.items():
-        print(f"\n{k}: {len(v)} 条")
-        if not v.empty:
-            print(v.tail(2))
+def _get_ak_gold() -> pd.DataFrame:
+    """akshare 上期所黄金期货日线 (备用)"""
+    try:
+        import akshare as ak
+        df = ak.futures_zh_daily_sina(symbol="AU0")
+        if df is None or df.empty:
+            return pd.DataFrame()
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.set_index("date")
+        for col in ["open", "high", "low", "close", "volume"]:
+            if col not in df.columns:
+                df[col] = df.get("close", 0) if "close" in df.columns else 0
+        return df.sort_index()
+    except Exception as e:
+        logger.warning(f"akshare 黄金失败: {e}")
+        return pd.DataFrame()

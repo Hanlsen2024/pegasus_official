@@ -7,10 +7,10 @@
 # LLM 配置 (支持 OpenAI 兼容协议: GPT / Claude / DeepSeek / 国产模型)
 # ---------------------------------------------------------------------------
 llm:
-  provider: "openai"          # openai | deepseek | custom
+  provider: "deepseek"        # openai | deepseek | custom
   api_key: "${LLM_API_KEY}"   # 环境变量 LLM_API_KEY
-  base_url: "https://api.openai.com/v1"   # OpenAI兼容端点
-  model: "gpt-4o"             # gpt-4o | gpt-4-turbo | deepseek-chat | claude-3-opus
+  base_url: "https://api.deepseek.com/v1"   # DeepSeek 兼容 OpenAI 协议
+  model: "deepseek-chat"      # deepseek-chat | deepseek-reasoner
   temperature: 0.3            # 降低随机性，提高信号一致性
   max_tokens: 800
   timeout: 30                 # 超时(秒)

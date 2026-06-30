@@ -156,7 +156,7 @@ US_STOCK_MAP = {
 
 def get_us_stock_data(symbol: str) -> pd.DataFrame:
     """
-    获取美股个股/ETF 数据
+    获取美股个股/ETF 数据 (优先 akshare，备用 yfinance)
 
     Args:
         symbol: 美股代码 或 简称 (如 "AAPL" / "aapl")
@@ -166,6 +166,30 @@ def get_us_stock_data(symbol: str) -> pd.DataFrame:
     """
     code = US_STOCK_MAP.get(symbol.lower(), symbol.upper())
     logger.info(f"获取美股数据: {code}")
+
+    # 优先用 akshare (国内直连)
+    try:
+        import akshare as ak
+        df = ak.stock_us_hist(symbol=code, period="daily",
+                              start_date=(datetime.now() - timedelta(days=200)).strftime("%Y%m%d"),
+                              end_date=datetime.now().strftime("%Y%m%d"),
+                              adjust="qfq")
+        if df is not None and not df.empty:
+            # 标准化列名
+            col_map = {
+                "日期": "date", "开盘": "open", "最高": "high",
+                "最低": "low", "收盘": "close", "成交量": "volume",
+            }
+            df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+            if "date" in df.columns:
+                df["date"] = pd.to_datetime(df["date"])
+                df = df.set_index("date")
+            logger.info(f"akshare 美股获取成功: {code}, {len(df)} 条")
+            return df
+    except Exception as e:
+        logger.warning(f"akshare 美股失败: {e}")
+
+    # 备用 yfinance
     return _fetch_yfinance(code)
 
 
