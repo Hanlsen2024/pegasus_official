@@ -26,10 +26,31 @@ def analyze(market: str = Query("gold"), symbol: str = Query(None)):
 @app.get("/markets")
 def markets():
     from data.fetcher import US_STOCK_MAP, A_STOCK_MAP
+    from core.gold_analysts import get_gold_analysts
+    from core.analysts import get_all_analysts
     return {
-        "markets": {"gold":"黄金期货","us":"美股","a":"A股"},
-        "us_presets": {k:v for k,v in US_STOCK_MAP.items()},
-        "a_presets": {k:f"{v[1]}{v[0]}" for k,v in A_STOCK_MAP.items()},
+        "markets": {
+            "gold": {
+                "name": "黄金期货",
+                "data": "4H+日线多周期",
+                "analysts": len(get_gold_analysts()),
+                "analyst_names": [a.name for a in get_gold_analysts()],
+            },
+            "us": {
+                "name": "美股",
+                "data": "日线",
+                "analysts": len(get_all_analysts()),
+                "analyst_names": [a.name for a in get_all_analysts()],
+            },
+            "a": {
+                "name": "A股",
+                "data": "日线",
+                "analysts": len(get_all_analysts()),
+                "analyst_names": [a.name for a in get_all_analysts()],
+            },
+        },
+        "us_presets": {k: v for k, v in US_STOCK_MAP.items()},
+        "a_presets": {k: f"{v[1]}{v[0]}" for k, v in A_STOCK_MAP.items()},
     }
 
 
