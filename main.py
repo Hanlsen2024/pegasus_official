@@ -119,8 +119,8 @@ def run_analysis(market: str = "gold", symbol: str = None) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="皮卡斯 - 多市场交易信号分析")
     parser.add_argument("market", nargs="?", default="gold",
-                        choices=["gold", "us", "a", "us_stock", "a_stock"],
-                        help="市场类型: gold(黄金) / us(美股) / a(A股)")
+                        choices=["gold", "us", "a", "us_stock", "a_stock", "mock"],
+                        help="市场类型: gold(黄金) / us(美股) / a(A股) / mock(离线测试)")
     parser.add_argument("-s", "--symbol", default=None,
                         help="股票代码 (美股: AAPL/TSLA, A股: 600519/贵州茅台)")
     parser.add_argument("--compact", action="store_true",
@@ -130,7 +130,7 @@ def main():
     symbol = args.symbol
 
     # 若 market 看起来像股票代码，自动推断
-    if not symbol and args.market not in ("gold", "us", "a", "us_stock", "a_stock"):
+    if not symbol and args.market not in ("gold", "us", "a", "us_stock", "a_stock", "mock"):
         symbol = args.market
         # 按前缀推断市场
         if symbol.isdigit() and len(symbol) == 6:

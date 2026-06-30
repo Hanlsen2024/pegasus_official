@@ -213,7 +213,39 @@ def get_a_stock_data(symbol: str) -> pd.DataFrame:
 
 
 # ===================================================================
-# 4. 统一入口
+# 4. 离线模拟数据 (测试用)
+# ===================================================================
+
+def get_mock_data(length: int = 120) -> pd.DataFrame:
+    """
+    生成模拟 K 线数据，用于离线测试分析逻辑
+    """
+    import numpy as np
+
+    np.random.seed(42)
+    dates = pd.date_range(end=datetime.now(), periods=length, freq="B")
+    close = 100.0
+
+    prices = [close]
+    for _ in range(length - 1):
+        change = np.random.randn() * 1.5
+        close = close + change
+        prices.append(close)
+
+    df = pd.DataFrame({
+        "open":  [p + np.random.randn() * 0.3 for p in prices],
+        "high":  [p + abs(np.random.randn()) * 1.0 for p in prices],
+        "low":   [p - abs(np.random.randn()) * 1.0 for p in prices],
+        "close": prices,
+        "volume": [abs(np.random.randn()) * 1000000 + 500000 for _ in prices],
+    }, index=dates)
+
+    logger.info(f"生成模拟数据: {length} 条")
+    return df
+
+
+# ===================================================================
+# 5. 统一入口
 # ===================================================================
 
 MARKET_REGISTRY = {
@@ -222,6 +254,7 @@ MARKET_REGISTRY = {
     "a":         get_a_stock_data,
     "us_stock":  get_us_stock_data,
     "a_stock":   get_a_stock_data,
+    "mock":      get_mock_data,
 }
 
 
@@ -242,7 +275,7 @@ def get_market_data(market: str = "gold", symbol: str = None) -> pd.DataFrame:
         logger.error(f"不支持的市场类型: {market}，可选: {list(MARKET_REGISTRY.keys())}")
         return pd.DataFrame()
 
-    if market == "gold":
+    if market in ("gold", "mock"):
         return fetcher()
     else:
         if not symbol:
