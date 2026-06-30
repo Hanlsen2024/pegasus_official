@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from main import run_analysis
 
@@ -28,13 +28,34 @@ app.add_middleware(
 )
 
 
+# 前端 HTML 页面（缓存内容，避免每次读取文件）
+_FRONTEND_HTML = None
+
+
+def _load_html():
+    global _FRONTEND_HTML
+    if _FRONTEND_HTML is None:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        static_path = os.path.join(base_dir, "static", "index.html")
+        try:
+            with open(static_path, "r", encoding="utf-8") as f:
+                _FRONTEND_HTML = f.read()
+        except FileNotFoundError:
+            _FRONTEND_HTML = ""  # fallback
+    return _FRONTEND_HTML
+
+
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    """API 根目录"""
+    """前端页面"""
+    html = _load_html()
+    if html:
+        return html
+    # fallback: JSON API 信息
     return {
         "service": "皮卡斯 Picas",
         "version": "1.0.0",
