@@ -255,7 +255,6 @@ class BacktestEngine:
         open_trade: Optional[Trade] = None
         trades: List[Trade] = []
         equity_curve: List[dict] = []
-        peak_equity = capital
 
         min_bars = 30  # 指标预热
 
@@ -274,32 +273,73 @@ class BacktestEngine:
                 else:
                     open_trade.low_price = min(open_trade.low_price, current_low)
 
-                # 检查退出信号
-                exit_info = self._check_exit(open_trade, current_df, current_bar)
+                # 检查退出信号 (返回: (exit_price, reason, ladder_idx) 或 None)
+                exit_info = self._check_exit(open_trade, current_bar)
                 if exit_info:
                     exit_price, exit_reason, ladder_idx = exit_info
-                    open_trade.exit_price = exit_price
-                    open_trade.exit_time = bar_time
-                    open_trade.exit_reason = exit_reason
 
-                    # 计算盈亏
-                    if open_trade.direction == "LONG":
-                        raw_pnl = (exit_price - open_trade.entry_price) * open_trade.size
-                    else:
-                        raw_pnl = (open_trade.entry_price - exit_price) * open_trade.size
+                    if exit_reason in ("hard_stop", "stop_loss", "take_profit", "ladder_tp_complete", "end_of_data"):
+                        # ---- 完全平仓 ----
+                        open_trade.exit_price = exit_price
+                        open_trade.exit_time = bar_time
+                        open_trade.exit_reason = exit_reason
 
-                    # 扣除手续费
-                    fee = open_trade.entry_price * open_trade.size * self.commission * 2
-                    open_trade.pnl = raw_pnl - fee
-                    open_trade.pnl_pct = (open_trade.pnl / capital) * 100
-                    capital += open_trade.pnl
+                        if open_trade.direction == "LONG":
+                            raw_pnl = (exit_price - open_trade.entry_price) * open_trade.size
+                        else:
+                            raw_pnl = (open_trade.entry_price - exit_price) * open_trade.size
+                        fee = open_trade.entry_price * open_trade.size * self.commission * 2
+                        open_trade.pnl = raw_pnl - fee
+                        open_trade.pnl_pct = (open_trade.pnl / capital) * 100
+                        capital += open_trade.pnl
 
-                    # 阶梯部分平仓
-                    if exit_reason == "ladder_tp" and ladder_idx is not None:
+                        if exit_reason == "ladder_tp_complete" and ladder_idx is not None:
+                            open_trade.ladder_fills.append(ladder_idx)
+
+                        trades.append(open_trade)
+                        open_trade = None
+
+                    elif exit_reason == "ladder_tp":
+                        # ---- 部分平仓 (阶梯止盈) ----
+                        step = self.ladder_tp[ladder_idx]
+                        close_ratio = step.get("close_ratio", 0.3)
+                        orig_size = getattr(open_trade, '_orig_size', open_trade.size)
+                        partial_size = orig_size * close_ratio
+
+                        if open_trade.direction == "LONG":
+                            raw_pnl = (exit_price - open_trade.entry_price) * partial_size
+                        else:
+                            raw_pnl = (open_trade.entry_price - exit_price) * partial_size
+                        fee = open_trade.entry_price * partial_size * self.commission * 2
+                        partial_pnl = raw_pnl - fee
+
+                        # 记录部分平仓
+                        part_trade = Trade(
+                            entry_time=open_trade.entry_time,
+                            exit_time=bar_time,
+                            symbol=open_trade.symbol,
+                            direction=open_trade.direction,
+                            entry_price=open_trade.entry_price,
+                            exit_price=exit_price,
+                            size=round(partial_size, 6),
+                            pnl=round(partial_pnl, 2),
+                            pnl_pct=round((partial_pnl / capital) * 100, 4),
+                            exit_reason="ladder_tp",
+                            ladder_fills=[ladder_idx],
+                        )
+                        trades.append(part_trade)
+                        capital += partial_pnl
+
+                        # 缩减剩余仓位
+                        open_trade.size -= partial_size
                         open_trade.ladder_fills.append(ladder_idx)
 
-                    trades.append(open_trade)
-                    open_trade = None
+                        # 阶梯止盈后保本
+                        open_trade._sl_price = open_trade.entry_price
+                        open_trade._breakeven_activated = True
+
+                        if open_trade.size <= 0:
+                            open_trade = None
 
             # ---- 从预计算序列中提取当前指标快照 (O(1)) ----
             indicators = snap_indicators_at(indicator_series, i, current_price)
@@ -360,6 +400,7 @@ class BacktestEngine:
                 trade._hard_sl = hard_sl
                 trade._atr = atr
                 trade._sl_distance = sl_distance
+                trade._orig_size = size
                 trade._trail_activated = False
                 trade._breakeven_activated = False
                 trade._ladder_triggered = set()
@@ -373,9 +414,6 @@ class BacktestEngine:
                 "price": round(current_price, 2),
                 "has_position": open_trade is not None,
             })
-
-            if capital > peak_equity:
-                peak_equity = capital
 
         # ---- 强制平仓最后持仓 ----
         if open_trade is not None:
@@ -410,7 +448,7 @@ class BacktestEngine:
     # 退出检查
     # ------------------------------------------------------------------
 
-    def _check_exit(self, trade: Trade, df: pd.DataFrame,
+    def _check_exit(self, trade: Trade,
                     bar: pd.Series) -> Optional[Tuple[float, str, Optional[int]]]:
         """
         检查是否触发退出条件
@@ -418,6 +456,8 @@ class BacktestEngine:
 
         Returns:
             (exit_price, reason, ladder_index) 或 None
+            reason: hard_stop/stop_loss/ladder_tp/ladder_tp_complete/take_profit
+            ladder_tp 表示部分平仓,ladder_tp_complete 表示阶梯全部执行完毕
         """
         price = float(bar["close"])
         high = float(bar["high"])
@@ -443,35 +483,39 @@ class BacktestEngine:
         # ---- 3. 阶梯止盈 ----
         ladder = self.ladder_tp
         triggered = getattr(trade, '_ladder_triggered', set())
-        for idx, step in enumerate(ladder):
-            if idx in triggered:
-                continue
-            tp_pct = step.get("pct", 5) / 100
-            if is_long:
-                tp_price = trade.entry_price * (1 + tp_pct)
-                if high >= tp_price:
-                    triggered.add(idx)
-                    trade._ladder_triggered = triggered
-                    # 部分平仓(不减size，记录fill)
-                    partial_ratio = step.get("close_ratio", 0.3)
-                    remaining = 1.0 - sum(
-                        ladder[i].get("close_ratio", 0) for i in triggered
-                    )
-                    if remaining <= 0:
-                        return (tp_price, "ladder_tp_complete", idx)
-                    return (tp_price, "ladder_tp", idx)
-            else:
-                tp_price = trade.entry_price * (1 - tp_pct)
-                if low <= tp_price:
-                    triggered.add(idx)
-                    trade._ladder_triggered = triggered
-                    partial_ratio = step.get("close_ratio", 0.3)
-                    remaining = 1.0 - sum(
-                        ladder[i].get("close_ratio", 0) for i in triggered
-                    )
-                    if remaining <= 0:
-                        return (tp_price, "ladder_tp_complete", idx)
-                    return (tp_price, "ladder_tp", idx)
+        if not ladder:
+            pass  # 无阶梯配置则跳过
+        else:
+            for idx, step in enumerate(ladder):
+                if idx in triggered:
+                    continue
+                tp_pct = step.get("pct", 5) / 100
+                close_ratio = step.get("close_ratio", 0.3)
+                if is_long:
+                    tp_price = trade.entry_price * (1 + tp_pct)
+                    if high >= tp_price:
+                        triggered.add(idx)
+                        trade._ladder_triggered = triggered
+                        # 检查是否最后一阶
+                        total_closed = sum(
+                            ladder[i].get("close_ratio", 0) for i in triggered
+                        )
+                        remaining = 1.0 - total_closed
+                        if remaining <= 0.0001:
+                            return (tp_price, "ladder_tp_complete", idx)
+                        return (tp_price, "ladder_tp", idx)
+                else:
+                    tp_price = trade.entry_price * (1 - tp_pct)
+                    if low <= tp_price:
+                        triggered.add(idx)
+                        trade._ladder_triggered = triggered
+                        total_closed = sum(
+                            ladder[i].get("close_ratio", 0) for i in triggered
+                        )
+                        remaining = 1.0 - total_closed
+                        if remaining <= 0.0001:
+                            return (tp_price, "ladder_tp_complete", idx)
+                        return (tp_price, "ladder_tp", idx)
 
         # ---- 4. 目标止盈 ----
         tp = getattr(trade, '_tp_price', None)

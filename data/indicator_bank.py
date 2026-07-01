@@ -264,6 +264,9 @@ def compute_indicator_series(df: pd.DataFrame) -> dict:
     # 波动率
     atr = calc_atr(df)
     
+    # 动量补充
+    roc10 = calc_roc(close, 10)
+    
     series = {
         "ema12": ema12,
         "ema26": ema26,
@@ -271,6 +274,7 @@ def compute_indicator_series(df: pd.DataFrame) -> dict:
         "macd_hist": macd_data["histogram"],
         "rsi14": rsi,
         "stoch_k": stoch["k"],
+        "roc10": roc10,
         "atr14": atr,
         "bb_upper": bb["upper"],
         "bb_mid": bb["mid"],
@@ -289,9 +293,6 @@ def snap_indicators_at(series: dict, idx: int, price: float) -> dict:
         if idx < 0 or idx >= len(s):
             return float("nan")
         return float(s.iloc[idx])
-    
-    def vals(keys):
-        return {k: round(val(k), 2) for k in keys}
     
     ema12_val = val("ema12")
     ema26_val = val("ema26")
@@ -349,7 +350,7 @@ def snap_indicators_at(series: dict, idx: int, price: float) -> dict:
             "rsi_zone": rsi_zone,
             "stoch_k": round(val("stoch_k"), 2) if not pd.isna(val("stoch_k")) else 50.0,
             "stoch_d": "N/A",
-            "roc10": 0.0,
+            "roc10": round(val("roc10"), 2) if not pd.isna(val("roc10")) else 0.0,
         },
         "volatility": {
             "atr14": round(atr_val, 2) if not pd.isna(atr_val) else 0.0,
