@@ -80,6 +80,7 @@ class LLMClient:
 
             data = response.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            logger.info(f"LLM 原始返回 (前200字): {content[:200]}")
             return content.strip() if content else None
 
         except Exception as e:
@@ -111,6 +112,7 @@ class LLMClient:
         if raw is None:
             return {"action": "HOLD", "confidence": 0.0,
                     "reasoning": "LLM调用失败", "signals": [], "key_level": ""}
+        logger.info(f"LLM 解析 JSON (前300字): {raw[:300]}")
 
         # 尝试解析 JSON
         try:
