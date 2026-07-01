@@ -1,8 +1,8 @@
 numpy>=1.26.0
 pandas>=2.1.0
 akshare>=1.11.0
-MetaTrader5>=5.0
 fastapi>=0.100.0
 uvicorn>=0.23.0
 httpx>=0.25.0
 pyyaml>=6.0
+# MetaTrader5 是 Windows-only，Railway 是 Linux 容器，故不放
