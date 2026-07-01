@@ -85,7 +85,7 @@ def markets():
     """市场与 Agent 信息"""
     from config.loader import get_market_config
     markets_info = {}
-    for m in ["gold", "us_stock", "a_stock"]:
+    for m in ["gold", "us_stock", "a_stock", "crypto"]:
         cfg = get_market_config(m)
         markets_info[m] = {
             "name": cfg.get("name", m),

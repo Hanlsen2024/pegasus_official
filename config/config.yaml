@@ -97,9 +97,21 @@ markets:
       "000001": "平安银行"
       "002594": "比亚迪"
       "601318": "中国平安"
+  crypto:
+    name: "数字货币"
+    timeframes: ["1h", "4h", "1d"]
+    agents: ["indicator", "pattern", "trend"]
+    presets:
+      "BTC-USD": "比特币"
+      "ETH-USD": "以太坊"
+      "SOL-USD": "Solana"
+      "BNB-USD": "币安币"
+      "DOGE-USD": "狗狗币"
+      "XRP-USD": "瑞波币"
+      "AVAX-USD": "Avalanche"
 
 # ---------------------------------------------------------------------------
-# 风控与出场策略
+# 风控与出场策略 (通用默认)
 # ---------------------------------------------------------------------------
 risk:
   default_tp_pct: 5.0        # 默认止盈百分比
@@ -112,3 +124,36 @@ risk:
       close_ratio: 0.4
     - pct: 10.0
       close_ratio: 0.3
+
+# ---------------------------------------------------------------------------
+# 数字货币专属风控 (高波动市场需要更大容错空间)
+# ---------------------------------------------------------------------------
+crypto_risk:
+  default_tp_pct: 8.0        # 止盈百分比 (币圈波动大)
+  default_sl_pct: 5.0        # 止损百分比
+  atr_trailing_mult: 3.0     # ATR倍数放大
+  ladder_tp:
+    - pct: 3.0
+      close_ratio: 0.25
+    - pct: 8.0
+      close_ratio: 0.35
+    - pct: 15.0
+      close_ratio: 0.40
+  trail_trigger_atr: 2.0     # 追踪止损触发更晚
+  trail_distance_atr: 1.5    # 追踪距离更宽
+  breakeven_trigger_atr: 1.5
+  hard_stop_pct: 0.08        # 硬止损8%
+  risk_reward_ratio: 2.5     # 更高风报比要求
+
+# ---------------------------------------------------------------------------
+# Freqtrade 被动执行配置
+# ---------------------------------------------------------------------------
+freqtrade:
+  enabled: false              # 是否启用 Freqtrade 执行
+  base_url: "http://localhost:8080"  # Freqtrade REST API 地址
+  api_token: "${FREQTRADE_API_TOKEN}"  # 环境变量
+  dry_run: true               # 默认模拟交易
+  stake_currency: "USDT"
+  stake_amount: 100           # 单笔默认金额
+  max_open_trades: 3          # 最大并发持仓
+  timeout: 10                 # API超时(秒)

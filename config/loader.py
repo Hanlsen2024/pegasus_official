@@ -55,5 +55,16 @@ def get_market_config(market: str) -> dict:
     return load_config().get("markets", {}).get(market, {})
 
 
-def get_risk_config() -> dict:
-    return load_config().get("risk", {})
+def get_risk_config(market: str = None) -> dict:
+    """
+    获取风控配置
+    
+    Args:
+        market: 市场类型，crypto 时返回数字货币专属配置
+    """
+    cfg = load_config()
+    if market == "crypto":
+        crypto_cfg = cfg.get("crypto_risk", {})
+        if crypto_cfg:
+            return crypto_cfg
+    return cfg.get("risk", {})

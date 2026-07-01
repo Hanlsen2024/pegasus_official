@@ -26,7 +26,8 @@ class RiskManagerAgent:
         self.name = "🛡️ 风控师"
         self.weight = weight
     
-    def analyze(self, trader_decision: dict, data_pack: dict, portfolio: dict) -> dict:
+    def analyze(self, trader_decision: dict, data_pack: dict, portfolio: dict,
+                market: str = "default") -> dict:
         """
         根据操盘手决策和持仓状态，计算风控参数
         
@@ -34,6 +35,7 @@ class RiskManagerAgent:
             trader_decision: 操盘手的输出 {"action": "LONG"|"SHORT"|"CLOSE"|"HOLD", "size": ..., "entry_price": ...}
             data_pack: 市场数据 {"price": ..., "atr": ..., "atr_pct": ..., "symbol": ...}
             portfolio: 账户状态 {"equity": ..., "risk_per_trade": ..., "position": ...}
+            market: 市场类型 (crypto 时使用数字货币专属风控参数)
         
         Returns:
             dict: 风控参数
@@ -42,9 +44,9 @@ class RiskManagerAgent:
         entry_price = trader_decision.get("entry_price", data_pack.get("price", 0))
         size = trader_decision.get("size", 0)
         
-        # 获取配置参数
+        # 获取配置参数 (数字货币有独立风控)
         from config.loader import get_risk_config
-        risk_cfg = get_risk_config()
+        risk_cfg = get_risk_config(market)
         
         # 计算 ATR 点数
         atr = data_pack.get("atr", 0)

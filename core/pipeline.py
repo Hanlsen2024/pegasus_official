@@ -78,6 +78,40 @@ def _prepare_stock_data(market: str, symbol: str) -> dict:
     }
 
 
+def _prepare_crypto_data(symbol: str) -> dict:
+    """数字货币多时间框架数据准备"""
+    from data.fetcher import get_crypto_data
+
+    # 获取多个周期数据
+    df_4h = get_crypto_data(symbol, interval="4h")
+    df_1h = get_crypto_data(symbol, interval="1h")
+    df_daily = get_crypto_data(symbol, interval="1d")
+
+    if df_4h.empty and df_1h.empty:
+        raise ValueError(f"无法获取数字货币 {symbol} 数据")
+
+    # 优先使用4H作为主周期
+    main_df = df_4h if not df_4h.empty else df_1h
+    indicators = compute_all_indicators(main_df)
+    indicators_1h = compute_all_indicators(df_1h) if not df_1h.empty else {}
+    indicators_daily = compute_all_indicators(df_daily) if not df_daily.empty else {}
+
+    price_summary = _build_price_summary(main_df)
+
+    return {
+        "market": "crypto",
+        "symbol": symbol,
+        "price": indicators.get("price", 0),
+        "indicators": indicators,
+        "multi_timeframe": {
+            "1H": _tf_summary(indicators_1h) if indicators_1h else {},
+            "4H": _tf_summary(indicators),
+            "日线": _tf_summary(indicators_daily) if indicators_daily else {},
+        },
+        "price_summary": price_summary,
+    }
+
+
 def _tf_summary(indicators: dict) -> dict:
     """从指标字典提取时间框架摘要"""
     if not indicators:
@@ -167,6 +201,10 @@ def run_ai_pipeline(market: str = "gold", symbol: str = None) -> dict:
             if not symbol:
                 return {"error": f"market={market} 需要指定 symbol", "timestamp": datetime.now().isoformat()}
             data_pack = _prepare_stock_data(market, symbol)
+        elif market == "crypto":
+            if not symbol:
+                return {"error": "crypto 需要指定 symbol (如 BTC-USD)", "timestamp": datetime.now().isoformat()}
+            data_pack = _prepare_crypto_data(symbol)
         else:
             return {"error": f"不支持的市场: {market}", "timestamp": datetime.now().isoformat()}
     except Exception as e:
@@ -292,6 +330,8 @@ def run_trade_pipeline(market: str = "gold", symbol: str = None,
         data_pack = _prepare_gold_data()
     elif market in ("us", "a"):
         data_pack = _prepare_stock_data(market, symbol)
+    elif market == "crypto":
+        data_pack = _prepare_crypto_data(symbol)
     else:
         return {"error": f"不支持的市场: {market}"}
     
@@ -312,10 +352,10 @@ def run_trade_pipeline(market: str = "gold", symbol: str = None,
     trader = TraderAgent(weight=1.2)
     trader_result = trader.analyze(data_pack, market)
     
-    # ---- Step 4: 风控师审核 ----
+    # ---- Step 4: 风控师审核 (数字货币使用独立风控参数) ----
     from core.agents.risk_manager_agent import RiskManagerAgent
     risk_mgr = RiskManagerAgent(weight=1.0)
-    risk_result = risk_mgr.analyze(trader_result, data_pack, portfolio)
+    risk_result = risk_mgr.analyze(trader_result, data_pack, portfolio, market=market)
     
     # ---- Step 5: 汇总 ----
     summary = _build_trade_summary(analysis, trader_result, risk_result)
@@ -385,4 +425,4 @@ def _build_trade_summary(analysis: dict, trader: dict, risk: dict) -> dict:
 # =========================================================================
 
 __all__ = ["run_ai_pipeline", "run_trade_pipeline",
-           "_prepare_gold_data", "_prepare_stock_data"]
+           "_prepare_gold_data", "_prepare_stock_data", "_prepare_crypto_data"]

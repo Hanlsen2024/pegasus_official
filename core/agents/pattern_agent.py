@@ -16,7 +16,12 @@ class PatternAgent(AIBaseAgent):
         cfg = get_agent_config("pattern")
         base_role = cfg.get("role", "你是一位价格行为专家。")
 
+        market_context = {
+            "crypto": "数字货币市场7×24小时交易，K线形态和SMC流动性区域在1H/4H周期极为有效。特别注意：假突破频繁，需等待收盘确认；流动性猎杀(插针)常见于关键价位；整数关口和心理价位(如BTC 10万)有强磁吸效应。",
+        }.get(market, "")
+
         return f"""{base_role}
+{market_context}
 请根据提供的近期价格走势数据、支撑阻力位和成交量分布，识别以下信号：
 
 - 蜡烛图形态：锤子线/倒锤子、吞没、晨星/夜星、十字星

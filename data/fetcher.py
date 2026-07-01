@@ -237,7 +237,84 @@ def get_a_stock_data(symbol: str) -> pd.DataFrame:
 
 
 # ===================================================================
-# 4. 离线模拟数据 (测试用)
+# 4. 数字货币 (yfinance 支持 BTC-USD / ETH-USD 等)
+# ===================================================================
+
+# 常见加密货币映射 {简称: yfinance代码}
+CRYPTO_MAP = {
+    "btc":    "BTC-USD",
+    "eth":    "ETH-USD",
+    "sol":    "SOL-USD",
+    "bnb":    "BNB-USD",
+    "doge":   "DOGE-USD",
+    "xrp":    "XRP-USD",
+    "avax":   "AVAX-USD",
+    "ada":    "ADA-USD",
+    "dot":    "DOT-USD",
+    "matic":  "MATIC-USD",
+    "link":   "LINK-USD",
+    "uni":    "UNI-USD",
+    "atom":   "ATOM-USD",
+}
+
+# yfinance 支持的加密周期
+CRYPTO_INTERVALS = {
+    "1h": "1h",
+    "4h": "1h",   # yfinance 不支持4h，用1h替代
+    "1d": "1d",
+    "1w": "1wk",
+    "1mo": "1mo",
+}
+
+CRYPTO_PERIOD_MAP = {
+    "1h": "7d",    # 1小时线取7天数据
+    "4h": "30d",   # 4小时用1h数据取30天
+    "1d": "6mo",
+    "1w": "1y",
+    "1mo": "2y",
+}
+
+
+def get_crypto_data(symbol: str, interval: str = "4h") -> pd.DataFrame:
+    """
+    获取数字货币历史数据
+
+    Args:
+        symbol: 如 "BTC-USD" / "btc" / "BTC"
+        interval: "1h" / "4h" / "1d"
+
+    Returns:
+        pd.DataFrame (columns: open, high, low, close, volume)
+    """
+    # 标准化代码
+    code = CRYPTO_MAP.get(symbol.lower(), symbol.upper())
+    if "-" not in code and "/" not in code:
+        code = f"{code}-USD"
+
+    yf_interval = CRYPTO_INTERVALS.get(interval, "1d")
+    period = CRYPTO_PERIOD_MAP.get(interval, "6mo")
+
+    logger.info(f"获取数字货币数据: {code} interval={yf_interval} period={period}")
+
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(code)
+        df = ticker.history(period=period, interval=yf_interval)
+
+        if df.empty:
+            logger.warning(f"数字货币数据为空: {code}")
+            return pd.DataFrame()
+
+        df.columns = [c.lower() for c in df.columns]
+        logger.info(f"数字货币获取成功: {code}, {len(df)} 条记录")
+        return df
+    except Exception as e:
+        logger.error(f"数字货币数据获取失败 [{code}]: {e}")
+        return pd.DataFrame()
+
+
+# ===================================================================
+# 5. 离线模拟数据 (测试用)
 # ===================================================================
 
 def get_mock_data(length: int = 120) -> pd.DataFrame:
@@ -269,7 +346,7 @@ def get_mock_data(length: int = 120) -> pd.DataFrame:
 
 
 # ===================================================================
-# 5. 统一入口
+# 6. 统一入口
 # ===================================================================
 
 MARKET_REGISTRY = {
@@ -278,17 +355,20 @@ MARKET_REGISTRY = {
     "a":         get_a_stock_data,
     "us_stock":  get_us_stock_data,
     "a_stock":   get_a_stock_data,
+    "crypto":    get_crypto_data,
     "mock":      get_mock_data,
 }
 
 
-def get_market_data(market: str = "gold", symbol: str = None) -> pd.DataFrame:
+def get_market_data(market: str = "gold", symbol: str = None,
+                    interval: str = "1d") -> pd.DataFrame:
     """
     统一数据获取入口
 
     Args:
-        market: "gold" / "us" / "a"
-        symbol: 具体股票代码 (gold 时忽略)
+        market: "gold" / "us" / "a" / "crypto"
+        symbol: 具体股票/币种代码 (gold 时忽略)
+        interval: 时间周期 ("1h" / "4h" / "1d") — crypto 时有效
 
     Returns:
         pd.DataFrame (columns: open, high, low, close, volume)
@@ -301,6 +381,11 @@ def get_market_data(market: str = "gold", symbol: str = None) -> pd.DataFrame:
 
     if market in ("gold", "mock"):
         return fetcher()
+    elif market == "crypto":
+        if not symbol:
+            logger.error("crypto 需要指定 symbol")
+            return pd.DataFrame()
+        return fetcher(symbol, interval)
     else:
         if not symbol:
             logger.error(f"market={market} 需要指定 symbol")
