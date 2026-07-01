@@ -235,3 +235,133 @@ def compute_all_indicators(df: pd.DataFrame) -> dict:
         } if obv_val is not None else {},
         "sr_levels": sr,
     }
+
+
+# =========================================================================
+# 向量化指标序列 — 回测优化用 (O(n) 替代 O(n²))
+# =========================================================================
+
+def compute_indicator_series(df: pd.DataFrame) -> dict:
+    """
+    一次性计算全部指标序列，返回 dict[str, pd.Series]。
+    回测引擎可按索引值取值，无需每根K线重新计算全部指标。
+    
+    返回的每个 Series 与 df 等长，iloc[i] 即为第i根K线位置的值(无未来函数)。
+    """
+    close = df["close"]
+    
+    # 趋势
+    ema12 = calc_ema(close, 12)
+    ema26 = calc_ema(close, 26)
+    ema50 = calc_ema(close, 50)
+    macd_data = calc_macd(df)
+    bb = calc_bollinger(close)
+    
+    # 动量
+    rsi = calc_rsi(close, 14)
+    stoch = calc_stochastic(df)
+    
+    # 波动率
+    atr = calc_atr(df)
+    
+    series = {
+        "ema12": ema12,
+        "ema26": ema26,
+        "ema50": ema50,
+        "macd_hist": macd_data["histogram"],
+        "rsi14": rsi,
+        "stoch_k": stoch["k"],
+        "atr14": atr,
+        "bb_upper": bb["upper"],
+        "bb_mid": bb["mid"],
+        "bb_lower": bb["lower"],
+    }
+    
+    return series
+
+
+def snap_indicators_at(series: dict, idx: int, price: float) -> dict:
+    """
+    从预计算指标序列中提取 idx 位置的快照值（对标 compute_all_indicators 输出格式）。
+    """
+    def val(name):
+        s = series[name]
+        if idx < 0 or idx >= len(s):
+            return float("nan")
+        return float(s.iloc[idx])
+    
+    def vals(keys):
+        return {k: round(val(k), 2) for k in keys}
+    
+    ema12_val = val("ema12")
+    ema26_val = val("ema26")
+    ema50_val = val("ema50")
+    rsi_val = val("rsi14")
+    atr_val = val("atr14")
+    macd_hist_val = val("macd_hist")
+    
+    # MACD 方向：看histogram最近两根的变化
+    macd_hist_s = series["macd_hist"]
+    if idx >= 1 and not pd.isna(macd_hist_s.iloc[idx]) and not pd.isna(macd_hist_s.iloc[idx - 1]):
+        macd_dir = "up" if macd_hist_s.iloc[idx] > macd_hist_s.iloc[idx - 1] else "down"
+    else:
+        macd_dir = "flat"
+    
+    # 布林位置
+    bb_up = val("bb_upper")
+    bb_lo = val("bb_lower")
+    if pd.isna(bb_up) or pd.isna(bb_lo):
+        bb_pos = "inside"
+    elif price > bb_up:
+        bb_pos = "above_upper"
+    elif price < bb_lo:
+        bb_pos = "below_lower"
+    else:
+        bb_pos = "inside"
+    
+    # RSI 区域
+    if pd.isna(rsi_val):
+        rsi_zone = "neutral"
+    elif rsi_val < 30:
+        rsi_zone = "oversold"
+    elif rsi_val > 70:
+        rsi_zone = "overbought"
+    else:
+        rsi_zone = "neutral"
+    
+    return {
+        "price": round(price, 2),
+        "trend": {
+            "ema12": round(ema12_val, 2),
+            "ema26": round(ema26_val, 2),
+            "ema50": round(ema50_val, 2),
+            "ema_cross": "bullish" if ema12_val > ema26_val else "bearish",
+            "price_vs_ema50": "above" if price > ema50_val else "below",
+            "macd": {
+                "macd_line": "N/A",
+                "signal_line": "N/A",
+                "histogram": round(macd_hist_val, 4),
+                "direction": macd_dir,
+            },
+        },
+        "momentum": {
+            "rsi14": round(rsi_val, 2) if not pd.isna(rsi_val) else 50.0,
+            "rsi_zone": rsi_zone,
+            "stoch_k": round(val("stoch_k"), 2) if not pd.isna(val("stoch_k")) else 50.0,
+            "stoch_d": "N/A",
+            "roc10": 0.0,
+        },
+        "volatility": {
+            "atr14": round(atr_val, 2) if not pd.isna(atr_val) else 0.0,
+            "atr_pct": round(float(atr_val) / price * 100, 2) if price > 0 and not pd.isna(atr_val) else 0,
+            "bollinger": {
+                "upper": round(bb_up, 2),
+                "mid": round(val("bb_mid"), 2),
+                "lower": round(bb_lo, 2),
+                "bandwidth_pct": "N/A",
+                "position": bb_pos,
+            },
+        },
+        "volume": {},
+        "sr_levels": {},
+    }

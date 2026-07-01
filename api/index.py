@@ -108,6 +108,40 @@ def markets():
     }
 
 
+@app.get("/backtest")
+def backtest(
+    market: str = Query("gold"),
+    symbol: str = Query(None),
+    capital: float = Query(10000),
+    risk: float = Query(0.02),
+    days: int = Query(180),
+):
+    """
+    历史数据回测 — 基于规则化信号引擎
+    
+    用法: GET /backtest?market=gold&capital=10000&risk=0.02&days=180
+    
+    返回:
+        - 绩效指标: 收益率/胜率/盈亏比/夏普/最大回撤/年化收益
+        - 交易明细: 最近20笔
+        - 权益曲线: 采样数据
+    """
+    try:
+        from core.backtester import run_backtest
+        result = run_backtest(
+            market=market,
+            symbol=symbol,
+            initial_capital=capital,
+            risk_per_trade=risk,
+            lookback_days=days,
+        )
+        if "error" in result:
+            return JSONResponse(status_code=500, content=result)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "2.0.0"}
