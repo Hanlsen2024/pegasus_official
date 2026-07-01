@@ -79,7 +79,7 @@ class RuleSignalGenerator:
     """
 
     @staticmethod
-    def generate(indicators: dict, price_summary: str = "") -> dict:
+    def generate(indicators: dict) -> dict:
         """
         生成规则化交易信号
 
@@ -431,11 +431,12 @@ class BacktestEngine:
             open_trade.pnl = raw_pnl - fee
             open_trade.pnl_pct = (open_trade.pnl / capital) * 100
             capital += open_trade.pnl
+            exit_time = open_trade.exit_time
             trades.append(open_trade)
             open_trade = None
 
             equity_curve.append({
-                "time": open_trade.exit_time,
+                "time": exit_time,
                 "equity": round(capital, 2),
                 "price": round(last_price, 2),
                 "has_position": False,
