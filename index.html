@@ -147,9 +147,9 @@
 <div class="footer">皮卡斯 Picas 2.0 · AI驱动的多Agent量化信号引擎 · 数据仅供参考，不构成投资建议</div>
 
 <script>
-// ===== 配置：改成你的 Railway 服务地址 =====
-var API_BASE = 'https://pegasusofficial-production.up.railway.app';
-// =============================================
+// ===== 自动识别 API 地址（Railway / 本地 / 自定义域名均可用） =====
+var API_BASE = window.location.origin;
+// ======================================================================
 var currentMarket='gold';
 const presets={
   gold:[["GC=F","黄金期货"],["AU0","上期所黄金"]],
