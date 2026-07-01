@@ -4,12 +4,16 @@ Agent 工厂 — 统一创建和管理 Agent 实例
 from core.agents.indicator_agent import IndicatorAgent
 from core.agents.pattern_agent import PatternAgent
 from core.agents.trend_agent import TrendAgent
+from core.agents.trader_agent import TraderAgent
+from core.agents.risk_manager_agent import RiskManagerAgent
 
 # Agent 注册表
 AGENT_REGISTRY = {
     "indicator": IndicatorAgent,
     "pattern": PatternAgent,
     "trend": TrendAgent,
+    "trader": TraderAgent,
+    "risk_manager": RiskManagerAgent,
 }
 
 

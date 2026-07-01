@@ -93,6 +93,35 @@
   .error-msg { display:none; background:rgba(255,23,68,0.08); border:1px solid var(--red);
     color:var(--red); border-radius:var(--radius); padding:16px; margin-top:12px; font-size:0.88rem; }
   .footer { padding:30px; color:var(--muted); font-size:0.75rem; text-align:center; }
+  .tab-bar { display:flex; gap:0; margin-bottom:16px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); }
+  .tab-btn { flex:1; padding:12px; background:var(--card2); border:none; color:var(--muted); cursor:pointer; font-size:0.88rem; font-weight:600; transition:all 0.2s; }
+  .tab-btn:hover { background:rgba(83,51,237,0.1); }
+  .tab-btn.active { background:var(--accent2); color:#fff; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+  .trade-status { text-align:center; padding:16px 0; }
+  .trade-action { display:inline-block; padding:8px 24px; border-radius:30px; font-size:1.2rem; font-weight:800; letter-spacing:2px; margin:8px 0; }
+  .trade-action.LONG { background:rgba(0,230,118,0.12); color:var(--green); border:2px solid var(--green); }
+  .trade-action.SHORT { background:rgba(255,23,68,0.12); color:var(--red); border:2px solid var(--red); }
+  .trade-action.HOLD { background:rgba(240,165,0,0.12); color:var(--gold); border:2px solid var(--gold); }
+  .trade-action.CLOSE { background:rgba(83,51,237,0.12); color:#8b7cf0; border:2px solid var(--accent2); }
+  .risk-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .risk-item { background:var(--card2); border-radius:8px; padding:10px 12px; }
+  .risk-item .v { font-size:1rem; font-weight:700; }
+  .risk-item .l { font-size:0.68rem; color:var(--muted); }
+  .risk-item.warn .v { color:var(--red); }
+  .rules-list { margin-top:8px; }
+  .rules-list .rule { font-size:0.75rem; padding:4px 0; display:flex; align-items:center; gap:6px; }
+  .rules-list .rule.pass::before { content:"✅"; }
+  .rules-list .rule.warn::before { content:"⚡"; }
+  .rules-list .rule.fail::before { content:"❌"; }
+  .auto-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .auto-controls select { background:var(--card2); border:2px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-size:0.85rem; }
+  .auto-controls label { font-size:0.82rem; color:var(--muted); }
+  .countdown { color:var(--accent); font-size:0.82rem; font-weight:600; }
+  .pos-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:0.7rem; font-weight:700; }
+  .pos-badge.long { background:rgba(0,230,118,0.15); color:var(--green); }
+  .pos-badge.short { background:rgba(255,23,68,0.15); color:var(--red); }
   @media (max-width:500px) {
     .header h1 { font-size:2rem; }
     .market-btn { padding:12px 6px; font-size:0.75rem; }
@@ -109,6 +138,13 @@
 </div>
 
 <div class="container">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('analyze')">🧠 AI 分析</button>
+    <button class="tab-btn" onclick="switchTab('trade')">⚡ 交易面板</button>
+  </div>
+
+  <!-- 分析面板 -->
+  <div class="tab-panel active" id="panel-analyze">
   <div class="card">
     <h3>📍 选择市场</h3>
     <div class="market-grid" id="marketGrid">
@@ -143,6 +179,81 @@
       <div class="snapshot" id="indicatorSnapshot"></div>
     </div>
   </div>
+  </div>
+
+  <!-- 交易面板 -->
+  <div class="tab-panel" id="panel-trade">
+    <div class="card">
+      <h3>💰 账户设置</h3>
+      <div class="risk-grid">
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);">账户净值 ($)</label>
+          <div class="input-row" style="margin-top:4px;">
+            <input type="number" id="equityInput" value="10000" min="100" step="100" style="width:100%;padding:10px;">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);">单笔风险 (%)</label>
+          <div class="input-row" style="margin-top:4px;">
+            <input type="number" id="riskInput" value="2" min="0.5" max="10" step="0.5" style="width:100%;padding:10px;">
+          </div>
+        </div>
+      </div>
+      <div class="risk-grid" style="margin-top:8px;">
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);">风报比</label>
+          <div class="input-row" style="margin-top:4px;">
+            <select id="rrInput" style="width:100%;padding:10px;background:var(--card2);border:2px solid var(--border);border-radius:var(--radius);color:var(--text);">
+              <option value="1.5">1.5 : 1</option>
+              <option value="2.0" selected>2.0 : 1</option>
+              <option value="2.5">2.5 : 1</option>
+              <option value="3.0">3.0 : 1</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);">当前持仓</label>
+          <div style="margin-top:4px;padding:10px;background:var(--card2);border-radius:var(--radius);min-height:38px;" id="posDisplay">空仓</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>⏱️ 自动分析</h3>
+      <div class="auto-controls">
+        <label>间隔:</label>
+        <select id="intervalSelect" onchange="updateInterval()">
+          <option value="0">手动</option>
+          <option value="15">15分钟</option>
+          <option value="30">30分钟</option>
+          <option value="60" selected>1小时</option>
+          <option value="120">2小时</option>
+          <option value="240">4小时</option>
+        </select>
+        <span class="countdown" id="countdown"></span>
+      </div>
+    </div>
+
+    <button class="btn-analyze" id="btnTrade" onclick="runTrade()" style="margin-top:0;">🎯 执行交易分析</button>
+    <div class="loading" id="tradeLoading"><div class="spinner"></div><p>操盘手+风控师 分析中...</p></div>
+    <div class="error-msg" id="tradeError"></div>
+
+    <div class="result" id="tradeResult">
+      <div class="card">
+        <div class="trade-status" id="tradeStatus">
+          <div style="font-size:0.85rem;color:var(--muted);" id="tradeMarketLabel"></div>
+          <div class="trade-action" id="tradeActionBadge">HOLD</div>
+          <div id="tradeDetail" style="font-size:0.82rem;color:var(--muted);"></div>
+        </div>
+        <div class="scores" id="tradeMetrics" style="margin:12px 0;"></div>
+        <h3>🛡️ 风控参数</h3>
+        <div id="riskParams"></div>
+        <h3 style="margin-top:10px;">📋 风控规则检查</h3>
+        <div class="rules-list" id="rulesCheck"></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 <div class="footer">皮卡斯 Picas 2.0 · AI驱动的多Agent量化信号引擎 · 数据仅供参考，不构成投资建议</div>
 
@@ -163,6 +274,209 @@ document.querySelectorAll('.market-btn').forEach(function(btn){
     btn.classList.add('active');
     currentMarket=btn.dataset.market;
     updatePresets();
+
+// ===== 交易面板逻辑 =====
+var tradeTimer=null, countdownTimer=null, currentPos=null;
+
+// Tab 切换
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+  event.target.classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+// 更新间隔
+function updateInterval(){
+  clearInterval(tradeTimer);
+  clearInterval(countdownTimer);
+  var v=parseInt(document.getElementById('intervalSelect').value);
+  document.getElementById('countdown').textContent='';
+  if(v>0){
+    document.getElementById('countdown').textContent='下一次: '+v+'分钟后';
+    var remaining=v*60;
+    countdownTimer=setInterval(function(){
+      remaining--;
+      if(remaining<=0){remaining=v*60; autoTrade();}
+      var m=Math.floor(remaining/60),s=remaining%60;
+      document.getElementById('countdown').textContent='倒计时: '+m+'分'+s+'秒';
+    },1000);
+    autoTrade(); // 立即执行第一次
+  }
+}
+
+// 自动交易
+function autoTrade(){
+  // 检查是否在交易面板标签页
+  var tp=document.getElementById('panel-trade');
+  if(!tp.classList.contains('active')) return;
+  runTrade();
+}
+
+// 加载持仓状态
+function loadPortfolio(){
+  try{
+    var saved=localStorage.getItem('picas_portfolio');
+    if(saved) currentPos=JSON.parse(saved);
+    else currentPos=null;
+  }catch(e){currentPos=null;}
+  updatePosDisplay();
+}
+function savePortfolio(pos){
+  currentPos=pos;
+  try{localStorage.setItem('picas_portfolio',JSON.stringify(pos||{}));}catch(e){}
+  updatePosDisplay();
+}
+function updatePosDisplay(){
+  var d=document.getElementById('posDisplay');
+  if(currentPos && currentPos.type){
+    var cls=currentPos.type, icon=cls==='long'?'🟢':'🔴';
+    d.innerHTML=icon+' <span class="pos-badge '+cls+'">'+(cls==='long'?'做多':'做空')+'</span> @'+currentPos.entry_price+' 手数:'+currentPos.size+' SL:'+(currentPos.stop_loss||'N/A');
+  }else{
+    d.innerHTML='空仓';
+  }
+}
+
+// 执行交易分析
+async function runTrade(){
+  var b=document.getElementById('btnTrade'),
+      l=document.getElementById('tradeLoading'),
+      r=document.getElementById('tradeResult'),
+      e=document.getElementById('tradeError');
+  r.style.display='none'; e.style.display='none';
+  b.disabled=true; l.style.display='block';
+  
+  var equity=parseFloat(document.getElementById('equityInput').value)||10000;
+  var risk=parseFloat(document.getElementById('riskInput').value)/100||0.02;
+  var rr=parseFloat(document.getElementById('rrInput').value)||2.0;
+  var s=document.getElementById('symbolInput').value.trim();
+  
+  var u=API_BASE+'/trade?market='+currentMarket+'&equity='+equity+'&risk_per_trade='+risk;
+  if(s) u+='&symbol='+encodeURIComponent(s);
+  
+  // 附加持仓
+  loadPortfolio();
+  if(currentPos && currentPos.type){
+    u+='&pos_type='+currentPos.type+'&pos_entry='+(currentPos.entry_price||0)+'&pos_size='+(currentPos.size||0)+'&pos_sl='+(currentPos.stop_loss||0);
+  }
+  
+  try{
+    var resp=await fetch(u);
+    if(!resp.ok){var j=await resp.json();throw new Error(j.error||'HTTP '+resp.status)}
+    var d=await resp.json();
+    renderTrade(d);
+    // 保存持仓状态
+    if(d.trader && d.trader.action!=='HOLD'){
+      // 简化: 如果开仓则更新持仓
+      var ac=d.trader.action;
+      if(ac==='LONG'||ac==='SHORT'){
+        var stops=d.risk_manager&&d.risk_manager.stops;
+        var sl=stops?stops.final_stop_loss.price:0;
+        savePortfolio({
+          type:ac.toLowerCase(),
+          entry_price:d.trader.entry_price||d.price,
+          size:d.trader.size||0,
+          stop_loss:sl
+        });
+      }else if(ac==='CLOSE'){
+        savePortfolio(null);
+      }
+    }
+  }catch(err){
+    e.textContent='❌ '+err.message; e.style.display='block';
+  }finally{b.disabled=false;l.style.display='none'}
+}
+
+// 渲染交易结果
+function renderTrade(d){
+  document.getElementById('tradeResult').style.display='block';
+  
+  var n={gold:'🥇 黄金期货',us:'🇺🇸 美股',a:'🇨🇳 A股'};
+  document.getElementById('tradeMarketLabel').textContent=(n[currentMarket]||currentMarket)+' · '+(d.symbol||'-')+' | 价格: $'+(d.price||'N/A');
+  
+  // 交易信号
+  if(d.summary){
+    var s=d.summary;
+    document.getElementById('tradeActionBadge').textContent=s.title||'HOLD';
+    document.getElementById('tradeActionBadge').className='trade-action '+(s.action||'HOLD');
+    document.getElementById('tradeDetail').textContent=s.detail||'';
+  }
+  
+  // 交易指标
+  var m=document.getElementById('tradeMetrics');
+  if(d.summary && d.summary.action!=='HOLD'){
+    m.innerHTML=
+      '<div class="score-item"><div class="val buy">$'+(d.summary.entry_price||'-')+'</div><div class="lbl">入场价</div></div>'+
+      '<div class="score-item"><div class="val sell">$'+(d.summary.stop_loss||'-')+'</div><div class="lbl">止损价</div></div>'+
+      '<div class="score-item"><div class="val net">$'+(d.summary.take_profit||'-')+'</div><div class="lbl">止盈价</div></div>';
+  }else{
+    m.innerHTML='';
+  }
+  
+  // 风控参数
+  var rp=document.getElementById('riskParams'); rp.innerHTML='';
+  if(d.risk_manager && d.risk_manager.stops){
+    var stops=d.risk_manager.stops;
+    var rm=d.risk_manager.risk_metrics||{};
+    var items=[
+      {label:'初始止损',value:'$'+stops.initial_stop_loss.price+' ('+stops.initial_stop_loss.method+')'},
+      {label:'最终止损',value:'$'+stops.final_stop_loss.price+' (±'+stops.final_stop_loss.pct_from_entry+'%)'},
+      {label:'硬止损',value:'$'+stops.hard_stop.price},
+      {label:'止盈目标',value:'$'+stops.take_profit.price+' (R:'+stops.take_profit.risk_reward_ratio+')'},
+      {label:'风险金额',value:'$'+(rm.risk_amount||0)+' ('+(rm.risk_pct_account||0)+'%账户)'},
+      {label:'收益目标',value:'$'+(rm.reward_amount||0)},
+    ];
+    
+    // 追踪止损和保本止损
+    if(stops.trailing_stop&&stops.trailing_stop.enabled){
+      items.push({label:'🔹 追踪止损',value:stops.trailing_stop.method});
+    }
+    if(stops.breakeven_stop&&stops.breakeven_stop.enabled){
+      items.push({label:'🔹 保本止损',value:stops.breakeven_stop.method});
+    }
+    
+    items.forEach(function(it){
+      rp.innerHTML+='<div class="risk-item"><div class="l">'+it.label+'</div><div class="v">'+it.value+'</div></div>';
+    });
+    
+    // 阶梯止盈
+    if(stops.ladder_tp && stops.ladder_tp.length>0){
+      rp.innerHTML+='<div class="risk-item" style="grid-column:1/-1"><div class="l">📊 阶梯止盈</div>';
+      stops.ladder_tp.forEach(function(st){
+        rp.innerHTML+='<div class="v" style="font-size:0.78rem;margin-top:4px;">盈利'+st.profit_pct+'% → 平仓'+st.close_ratio+' ('+st.close_size+'手) @$'+st.target_price+'</div>';
+      });
+      rp.innerHTML+='</div>';
+    }
+  }
+  
+  // 规则检查
+  var rc=document.getElementById('rulesCheck'); rc.innerHTML='';
+  if(d.risk_manager && d.risk_manager.rules_check){
+    d.risk_manager.rules_check.forEach(function(c){
+      var cls=c.status;
+      rc.innerHTML+='<div class="rule '+cls+'">'+c.rule+'：'+(c.msg||c.fix||'通过')+'</div>';
+    });
+  }
+  
+  // 分析师投票简览
+  if(d.analysis && d.analysis.analyst_votes){
+    var vh='<h3 style="margin-top:14px;">🎯 AI分析师投票</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+    d.analysis.analyst_votes.forEach(function(v){
+      var c=(v.signal||'').toLowerCase();
+      vh+='<span class="agent-signal '+c+'">'+v.name+': '+v.signal+'</span>';
+    });
+    vh+='</div>';
+    rp.insertAdjacentHTML('beforebegin',vh);
+  }
+  
+  document.getElementById('tradeResult').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// 初始化
+loadPortfolio();
+// 启动默认间隔
+document.getElementById('intervalSelect').value='60';
+updateInterval();
     document.getElementById('symbolInput').value='';
     hideResult();
   })
@@ -251,6 +565,209 @@ function renderResult(d,s){
   document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
 }
 updatePresets();
+
+// ===== 交易面板逻辑 =====
+var tradeTimer=null, countdownTimer=null, currentPos=null;
+
+// Tab 切换
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+  event.target.classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+// 更新间隔
+function updateInterval(){
+  clearInterval(tradeTimer);
+  clearInterval(countdownTimer);
+  var v=parseInt(document.getElementById('intervalSelect').value);
+  document.getElementById('countdown').textContent='';
+  if(v>0){
+    document.getElementById('countdown').textContent='下一次: '+v+'分钟后';
+    var remaining=v*60;
+    countdownTimer=setInterval(function(){
+      remaining--;
+      if(remaining<=0){remaining=v*60; autoTrade();}
+      var m=Math.floor(remaining/60),s=remaining%60;
+      document.getElementById('countdown').textContent='倒计时: '+m+'分'+s+'秒';
+    },1000);
+    autoTrade(); // 立即执行第一次
+  }
+}
+
+// 自动交易
+function autoTrade(){
+  // 检查是否在交易面板标签页
+  var tp=document.getElementById('panel-trade');
+  if(!tp.classList.contains('active')) return;
+  runTrade();
+}
+
+// 加载持仓状态
+function loadPortfolio(){
+  try{
+    var saved=localStorage.getItem('picas_portfolio');
+    if(saved) currentPos=JSON.parse(saved);
+    else currentPos=null;
+  }catch(e){currentPos=null;}
+  updatePosDisplay();
+}
+function savePortfolio(pos){
+  currentPos=pos;
+  try{localStorage.setItem('picas_portfolio',JSON.stringify(pos||{}));}catch(e){}
+  updatePosDisplay();
+}
+function updatePosDisplay(){
+  var d=document.getElementById('posDisplay');
+  if(currentPos && currentPos.type){
+    var cls=currentPos.type, icon=cls==='long'?'🟢':'🔴';
+    d.innerHTML=icon+' <span class="pos-badge '+cls+'">'+(cls==='long'?'做多':'做空')+'</span> @'+currentPos.entry_price+' 手数:'+currentPos.size+' SL:'+(currentPos.stop_loss||'N/A');
+  }else{
+    d.innerHTML='空仓';
+  }
+}
+
+// 执行交易分析
+async function runTrade(){
+  var b=document.getElementById('btnTrade'),
+      l=document.getElementById('tradeLoading'),
+      r=document.getElementById('tradeResult'),
+      e=document.getElementById('tradeError');
+  r.style.display='none'; e.style.display='none';
+  b.disabled=true; l.style.display='block';
+  
+  var equity=parseFloat(document.getElementById('equityInput').value)||10000;
+  var risk=parseFloat(document.getElementById('riskInput').value)/100||0.02;
+  var rr=parseFloat(document.getElementById('rrInput').value)||2.0;
+  var s=document.getElementById('symbolInput').value.trim();
+  
+  var u=API_BASE+'/trade?market='+currentMarket+'&equity='+equity+'&risk_per_trade='+risk;
+  if(s) u+='&symbol='+encodeURIComponent(s);
+  
+  // 附加持仓
+  loadPortfolio();
+  if(currentPos && currentPos.type){
+    u+='&pos_type='+currentPos.type+'&pos_entry='+(currentPos.entry_price||0)+'&pos_size='+(currentPos.size||0)+'&pos_sl='+(currentPos.stop_loss||0);
+  }
+  
+  try{
+    var resp=await fetch(u);
+    if(!resp.ok){var j=await resp.json();throw new Error(j.error||'HTTP '+resp.status)}
+    var d=await resp.json();
+    renderTrade(d);
+    // 保存持仓状态
+    if(d.trader && d.trader.action!=='HOLD'){
+      // 简化: 如果开仓则更新持仓
+      var ac=d.trader.action;
+      if(ac==='LONG'||ac==='SHORT'){
+        var stops=d.risk_manager&&d.risk_manager.stops;
+        var sl=stops?stops.final_stop_loss.price:0;
+        savePortfolio({
+          type:ac.toLowerCase(),
+          entry_price:d.trader.entry_price||d.price,
+          size:d.trader.size||0,
+          stop_loss:sl
+        });
+      }else if(ac==='CLOSE'){
+        savePortfolio(null);
+      }
+    }
+  }catch(err){
+    e.textContent='❌ '+err.message; e.style.display='block';
+  }finally{b.disabled=false;l.style.display='none'}
+}
+
+// 渲染交易结果
+function renderTrade(d){
+  document.getElementById('tradeResult').style.display='block';
+  
+  var n={gold:'🥇 黄金期货',us:'🇺🇸 美股',a:'🇨🇳 A股'};
+  document.getElementById('tradeMarketLabel').textContent=(n[currentMarket]||currentMarket)+' · '+(d.symbol||'-')+' | 价格: $'+(d.price||'N/A');
+  
+  // 交易信号
+  if(d.summary){
+    var s=d.summary;
+    document.getElementById('tradeActionBadge').textContent=s.title||'HOLD';
+    document.getElementById('tradeActionBadge').className='trade-action '+(s.action||'HOLD');
+    document.getElementById('tradeDetail').textContent=s.detail||'';
+  }
+  
+  // 交易指标
+  var m=document.getElementById('tradeMetrics');
+  if(d.summary && d.summary.action!=='HOLD'){
+    m.innerHTML=
+      '<div class="score-item"><div class="val buy">$'+(d.summary.entry_price||'-')+'</div><div class="lbl">入场价</div></div>'+
+      '<div class="score-item"><div class="val sell">$'+(d.summary.stop_loss||'-')+'</div><div class="lbl">止损价</div></div>'+
+      '<div class="score-item"><div class="val net">$'+(d.summary.take_profit||'-')+'</div><div class="lbl">止盈价</div></div>';
+  }else{
+    m.innerHTML='';
+  }
+  
+  // 风控参数
+  var rp=document.getElementById('riskParams'); rp.innerHTML='';
+  if(d.risk_manager && d.risk_manager.stops){
+    var stops=d.risk_manager.stops;
+    var rm=d.risk_manager.risk_metrics||{};
+    var items=[
+      {label:'初始止损',value:'$'+stops.initial_stop_loss.price+' ('+stops.initial_stop_loss.method+')'},
+      {label:'最终止损',value:'$'+stops.final_stop_loss.price+' (±'+stops.final_stop_loss.pct_from_entry+'%)'},
+      {label:'硬止损',value:'$'+stops.hard_stop.price},
+      {label:'止盈目标',value:'$'+stops.take_profit.price+' (R:'+stops.take_profit.risk_reward_ratio+')'},
+      {label:'风险金额',value:'$'+(rm.risk_amount||0)+' ('+(rm.risk_pct_account||0)+'%账户)'},
+      {label:'收益目标',value:'$'+(rm.reward_amount||0)},
+    ];
+    
+    // 追踪止损和保本止损
+    if(stops.trailing_stop&&stops.trailing_stop.enabled){
+      items.push({label:'🔹 追踪止损',value:stops.trailing_stop.method});
+    }
+    if(stops.breakeven_stop&&stops.breakeven_stop.enabled){
+      items.push({label:'🔹 保本止损',value:stops.breakeven_stop.method});
+    }
+    
+    items.forEach(function(it){
+      rp.innerHTML+='<div class="risk-item"><div class="l">'+it.label+'</div><div class="v">'+it.value+'</div></div>';
+    });
+    
+    // 阶梯止盈
+    if(stops.ladder_tp && stops.ladder_tp.length>0){
+      rp.innerHTML+='<div class="risk-item" style="grid-column:1/-1"><div class="l">📊 阶梯止盈</div>';
+      stops.ladder_tp.forEach(function(st){
+        rp.innerHTML+='<div class="v" style="font-size:0.78rem;margin-top:4px;">盈利'+st.profit_pct+'% → 平仓'+st.close_ratio+' ('+st.close_size+'手) @$'+st.target_price+'</div>';
+      });
+      rp.innerHTML+='</div>';
+    }
+  }
+  
+  // 规则检查
+  var rc=document.getElementById('rulesCheck'); rc.innerHTML='';
+  if(d.risk_manager && d.risk_manager.rules_check){
+    d.risk_manager.rules_check.forEach(function(c){
+      var cls=c.status;
+      rc.innerHTML+='<div class="rule '+cls+'">'+c.rule+'：'+(c.msg||c.fix||'通过')+'</div>';
+    });
+  }
+  
+  // 分析师投票简览
+  if(d.analysis && d.analysis.analyst_votes){
+    var vh='<h3 style="margin-top:14px;">🎯 AI分析师投票</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+    d.analysis.analyst_votes.forEach(function(v){
+      var c=(v.signal||'').toLowerCase();
+      vh+='<span class="agent-signal '+c+'">'+v.name+': '+v.signal+'</span>';
+    });
+    vh+='</div>';
+    rp.insertAdjacentHTML('beforebegin',vh);
+  }
+  
+  document.getElementById('tradeResult').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// 初始化
+loadPortfolio();
+// 启动默认间隔
+document.getElementById('intervalSelect').value='60';
+updateInterval();
 </script>
 </body>
 </html>

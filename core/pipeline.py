@@ -262,7 +262,127 @@ def run_ai_pipeline(market: str = "gold", symbol: str = None) -> dict:
 
 
 # =========================================================================
+# 交易管线 — 操盘手 + 风控师 (完整闭环)
+# =========================================================================
+
+def run_trade_pipeline(market: str = "gold", symbol: str = None,
+                       portfolio: dict = None) -> dict:
+    """
+    完整交易管线：3个分析师 → 操盘手 → 风控师
+    
+    Args:
+        market: 市场类型
+        symbol: 股票代码
+        portfolio: 账户信息 {"equity": 10000, "risk_per_trade": 0.02, 
+                            "position": None|{...}}
+    
+    Returns:
+        {"analysis": {...}, "trader": {...}, "risk_manager": {...}, "summary": str}
+    """
+    # ---- Step 1: 运行 AI 分析管线 ----
+    analysis = run_ai_pipeline(market=market, symbol=symbol)
+    
+    if "error" in analysis:
+        return {"error": analysis["error"], "timestamp": analysis["timestamp"]}
+    
+    portfolio = portfolio or {"equity": 10000, "risk_per_trade": 0.02, "position": None}
+    
+    # ---- Step 2: 准备操盘手数据 ----
+    if market == "gold":
+        data_pack = _prepare_gold_data()
+    elif market in ("us", "a"):
+        data_pack = _prepare_stock_data(market, symbol)
+    else:
+        return {"error": f"不支持的市场: {market}"}
+    
+    # 注入分析师结果和端口folio
+    data_pack["analyst_votes"] = analysis.get("analyst_votes", [])
+    data_pack["net_score"] = analysis.get("net_score", 0)
+    data_pack["signal"] = analysis.get("signal", "HOLD")
+    data_pack["portfolio"] = portfolio
+    
+    # 提取 ATR 和 RSI
+    indicators = data_pack.get("indicators", {})
+    data_pack["atr"] = indicators.get("volatility", {}).get("atr14", 0)
+    data_pack["atr_pct"] = indicators.get("volatility", {}).get("atr_pct", 0)
+    data_pack["rsi"] = indicators.get("momentum", {}).get("rsi14", 50)
+    
+    # ---- Step 3: 操盘手决策 ----
+    from core.agents.trader_agent import TraderAgent
+    trader = TraderAgent(weight=1.2)
+    trader_result = trader.analyze(data_pack, market)
+    
+    # ---- Step 4: 风控师审核 ----
+    from core.agents.risk_manager_agent import RiskManagerAgent
+    risk_mgr = RiskManagerAgent(weight=1.0)
+    risk_result = risk_mgr.analyze(trader_result, data_pack, portfolio)
+    
+    # ---- Step 5: 汇总 ----
+    summary = _build_trade_summary(analysis, trader_result, risk_result)
+    
+    logger.info(f"🎯 交易管线完成: {trader_result.get('action')}")
+    
+    return {
+        "timestamp": analysis["timestamp"],
+        "market": market,
+        "symbol": data_pack.get("symbol", symbol),
+        "price": analysis.get("price", 0),
+        "analysis": {
+            "signal": analysis["signal"],
+            "net_score": analysis["net_score"],
+            "buy_score": analysis["buy_score"],
+            "sell_score": analysis["sell_score"],
+            "agent_count": analysis["agent_count"],
+            "analyst_votes": analysis["analyst_votes"],
+            "indicators_snapshot": analysis["indicators_snapshot"],
+        },
+        "trader": trader_result,
+        "risk_manager": risk_result,
+        "summary": summary,
+    }
+
+
+def _build_trade_summary(analysis: dict, trader: dict, risk: dict) -> dict:
+    """构建交易汇总"""
+    action = trader.get("action", "HOLD")
+    
+    if action == "HOLD":
+        return {
+            "title": "🔵 观望",
+            "action": "HOLD",
+            "detail": "操盘手判断当前不宜操作，继续观察",
+            "signal_strength": f"净得分: {analysis.get('net_score', 0):.4f}",
+        }
+    
+    is_long = action == "LONG"
+    direction = "做多" if is_long else "做空"
+    direction_icon = "🟢" if is_long else "🔴"
+    
+    stops = risk.get("stops", {})
+    metrics = risk.get("risk_metrics", {})
+    
+    sl = stops.get("final_stop_loss", {}).get("price", "N/A")
+    tp = stops.get("take_profit", {}).get("price", "N/A")
+    
+    return {
+        "title": f"{direction_icon} {direction}",
+        "action": action,
+        "detail": trader.get("reason", ""),
+        "entry_price": trader.get("entry_price", 0),
+        "position_size": trader.get("size", 0),
+        "stop_loss": sl,
+        "take_profit": tp,
+        "risk_amount": metrics.get("risk_amount", 0),
+        "risk_pct": metrics.get("risk_pct_account", 0),
+        "risk_reward": metrics.get("risk_reward_ratio", 0),
+        "signal_strength": f"净得分: {analysis.get('net_score', 0):.4f}",
+        "confidence": trader.get("confidence", 0),
+    }
+
+
+# =========================================================================
 # 对外暴露
 # =========================================================================
 
-__all__ = ["run_ai_pipeline", "_prepare_gold_data", "_prepare_stock_data"]
+__all__ = ["run_ai_pipeline", "run_trade_pipeline",
+           "_prepare_gold_data", "_prepare_stock_data"]

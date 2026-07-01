@@ -46,6 +46,22 @@ agents:
     role: |
       你是一位多周期趋势分析师，专注于过滤市场噪音，识别大级别的结构方向。
       请根据多时间框架的趋势数据，判断当前的主要趋势方向和潜在转折点。
+  trader:
+    enabled: true
+    weight: 1.2
+    role: |
+      你是一位专业的量化交易操盘手，拥有十年实战经验。
+      你的核心职责是根据 AI 分析师团队的信号、当前持仓状态和账户净值，做出最佳的买卖决策。
+  risk_manager:
+    enabled: true
+    weight: 1.0
+    risk_params:
+      atr_stop_multiplier: 2.0
+      trail_trigger_atr: 1.5
+      trail_distance_atr: 1.0
+      breakeven_trigger_atr: 1.0
+      hard_stop_pct: 0.05
+      risk_reward_ratio: 2.0
 
 # ---------------------------------------------------------------------------
 # 市场配置
